@@ -1,0 +1,441 @@
+"use client";
+// ============================================================
+// CourseDrop — Teacher: Upload Files to Approved Subjects
+// (Real Google Drive integration)
+// ============================================================
+
+import React, { useEffect, useRef, useState } from "react";
+import { useAuth } from "@/context/AuthContext";
+import {
+  getApprovedSubjects,
+  getFilesByCourse,
+  addFile,
+  deleteFile,
+  getDriveFolderId,
+  setDriveFolderIdForCourse,
+} from "@/lib/store";
+import { StudyFile, SubjectRequest } from "@/lib/types";
+import { SectionHeader, EmptyState } from "@/components/ui";
+import UploadZone from "@/components/UploadZone";
+import FileCard from "@/components/FileCard";
+import ConfirmModal from "@/components/ConfirmModal";
+import { FiFolder, FiLock, FiLoader } from "react-icons/fi";
+import { uid } from "@/lib/utils";
+import toast from "react-hot-toast";
+
+interface UploadProgressState {
+  totalFiles: number;
+  completedFiles: number;
+  currentFileName: string;
+  currentFileProgress: number;
+  overallProgress: number;
+  etaSeconds: number | null;
+}
+
+type UploadApiResponse = {
+  file: Omit<StudyFile, "id">;
+  folderIdUsed?: string;
+};
+
+function formatEta(seconds: number | null): string {
+  if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
+    return "calculating...";
+  }
+
+  if (seconds < 60) {
+    return "Less than a minute";
+  }
+
+  const mins = Math.round(seconds / 60);
+  if (mins === 1) {
+    return "About a minute";
+  }
+  if (mins < 60) {
+    return `About ${mins} minutes`;
+  }
+
+  const hours = Math.round(mins / 60);
+  if (hours === 1) {
+    return "About an hour";
+  }
+  return `About ${hours} hours`;
+}
+
+export default function TeacherUploadPage() {
+  const { user } = useAuth();
+  const [subjects, setSubjects] = useState<SubjectRequest[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+  const [files, setFiles] = useState<StudyFile[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(
+    null
+  );
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const activeUploadXhrRef = useRef<XMLHttpRequest | null>(null);
+  const cancelUploadRef = useRef(false);
+
+  const refresh = () => {
+    if (!user) return;
+    const s = getApprovedSubjects(user.id);
+    setSubjects(s);
+    if (selectedCourse) setFiles(getFilesByCourse(selectedCourse));
+  };
+
+  useEffect(refresh, [user, selectedCourse]);
+
+  const uploadFileWithProgress = (
+    formData: FormData,
+    onProgress: (loadedBytes: number) => void
+  ): Promise<UploadApiResponse> =>
+    new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      activeUploadXhrRef.current = xhr;
+      xhr.open("POST", "/api/drive/upload");
+      xhr.responseType = "json";
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress(event.loaded);
+        }
+      };
+
+      xhr.onload = () => {
+        activeUploadXhrRef.current = null;
+
+        const body: unknown =
+          xhr.response && typeof xhr.response === "object"
+            ? xhr.response
+            : (() => {
+                try {
+                  return JSON.parse(xhr.responseText) as unknown;
+                } catch {
+                  return null;
+                }
+              })();
+
+        if (
+          xhr.status >= 200 &&
+          xhr.status < 300 &&
+          body &&
+          typeof body === "object" &&
+          "file" in body
+        ) {
+          resolve(body as UploadApiResponse);
+          return;
+        }
+
+        const error =
+          body &&
+          typeof body === "object" &&
+          "error" in body &&
+          typeof (body as { error?: unknown }).error === "string"
+            ? (body as { error: string }).error
+            : "Upload failed";
+        reject(new Error(error));
+      };
+
+      xhr.onerror = () => {
+        activeUploadXhrRef.current = null;
+        reject(new Error("Network error during upload"));
+      };
+
+      xhr.onabort = () => {
+        activeUploadXhrRef.current = null;
+        reject(new Error("Upload cancelled"));
+      };
+
+      xhr.send(formData);
+    });
+
+  const handleCancelUpload = () => {
+    cancelUploadRef.current = true;
+    activeUploadXhrRef.current?.abort();
+  };
+
+  const handleUpload = async (fileList: File[]) => {
+    if (!selectedCourse || !user) return;
+
+    const folderId = getDriveFolderId(selectedCourse);
+
+    setUploading(true);
+    cancelUploadRef.current = false;
+    let uploaded = 0;
+    let cancelled = false;
+
+    const currentSubject = subjects.find((s) => s.courseCode === selectedCourse);
+    let effectiveFolderId = folderId;
+    const totalBytes = fileList.reduce((sum, f) => sum + f.size, 0);
+    const uploadStartedAt = Date.now();
+    let completedBytes = 0;
+
+    setUploadProgress({
+      totalFiles: fileList.length,
+      completedFiles: 0,
+      currentFileName: fileList[0]?.name ?? "",
+      currentFileProgress: 0,
+      overallProgress: 0,
+      etaSeconds: null,
+    });
+
+    for (let i = 0; i < fileList.length; i++) {
+      if (cancelUploadRef.current) {
+        cancelled = true;
+        break;
+      }
+
+      const f = fileList[i];
+      try {
+        setUploadProgress((prev) => ({
+          totalFiles: prev?.totalFiles ?? fileList.length,
+          completedFiles: i,
+          currentFileName: f.name,
+          currentFileProgress: 0,
+          overallProgress:
+            totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 0,
+          etaSeconds: prev?.etaSeconds ?? null,
+        }));
+
+        const formData = new FormData();
+        formData.append("file", f);
+        formData.append("courseCode", selectedCourse);
+        if (effectiveFolderId) {
+          formData.append("folderId", effectiveFolderId);
+        }
+        formData.append("uploadedBy", user.id);
+        formData.append("uploadedByName", user.name);
+        formData.append("subjectName", currentSubject?.subjectName ?? selectedCourse);
+
+        const data = await uploadFileWithProgress(formData, (loadedBytes) => {
+          const uploadedBytes = completedBytes + loadedBytes;
+          const elapsedSeconds = Math.max((Date.now() - uploadStartedAt) / 1000, 0.1);
+          const bytesPerSecond = uploadedBytes / elapsedSeconds;
+          const remainingBytes = Math.max(totalBytes - uploadedBytes, 0);
+          const etaSeconds =
+            bytesPerSecond > 0 ? Math.ceil(remainingBytes / bytesPerSecond) : null;
+
+          setUploadProgress({
+            totalFiles: fileList.length,
+            completedFiles: i,
+            currentFileName: f.name,
+            currentFileProgress:
+              f.size > 0 ? Math.round((loadedBytes / f.size) * 100) : 0,
+            overallProgress:
+              totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0,
+            etaSeconds,
+          });
+        });
+
+        completedBytes += f.size;
+
+        if (data.folderIdUsed && data.folderIdUsed !== effectiveFolderId) {
+          effectiveFolderId = data.folderIdUsed;
+          setDriveFolderIdForCourse(selectedCourse, data.folderIdUsed);
+        }
+
+        // Store file metadata locally
+        const newFile: StudyFile = {
+          id: uid(),
+          name: data.file.name,
+          type: data.file.type,
+          size: data.file.size,
+          courseCode: data.file.courseCode,
+          subjectName: data.file.subjectName,
+          uploadedBy: data.file.uploadedBy,
+          uploadedByName: data.file.uploadedByName,
+          uploadDate: data.file.uploadDate,
+          driveFileId: data.file.driveFileId,
+          driveDownloadUrl: data.file.driveDownloadUrl,
+        };
+        addFile(newFile);
+        uploaded++;
+
+        setUploadProgress({
+          totalFiles: fileList.length,
+          completedFiles: i + 1,
+          currentFileName: f.name,
+          currentFileProgress: 100,
+          overallProgress:
+            totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 100,
+          etaSeconds:
+            i + 1 === fileList.length
+              ? 0
+              : Math.ceil(
+                  Math.max(
+                    (totalBytes - completedBytes) /
+                      Math.max(completedBytes / Math.max((Date.now() - uploadStartedAt) / 1000, 0.1), 1),
+                    0
+                  )
+                ),
+        });
+      } catch (err) {
+        if (err instanceof Error && err.message === "Upload cancelled") {
+          cancelled = true;
+          break;
+        }
+        console.error(`Upload failed for ${f.name}:`, err);
+        toast.error(
+          err instanceof Error ? err.message : `Failed to upload ${f.name}`
+        );
+      }
+    }
+
+    if (cancelled) {
+      toast.error("Upload cancelled.");
+    }
+
+    if (uploaded > 0) {
+      toast.success(`${uploaded} file(s) uploaded to Google Drive!`);
+    }
+
+    setUploadProgress(null);
+    activeUploadXhrRef.current = null;
+    setUploading(false);
+    refresh();
+  };
+
+  const handleDownload = (file: StudyFile) => {
+    window.open(`/api/drive/download?fileId=${file.driveFileId}`, "_blank");
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+
+    const file = files.find((f) => f.id === deleteTarget);
+    try {
+      // Delete from Google Drive
+      if (file && file.driveFileId && !file.driveFileId.startsWith("mock-")) {
+        const res = await fetch(`/api/drive/delete?fileId=${file.driveFileId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error || "Delete failed");
+        }
+      }
+
+      // Delete from local store
+      deleteFile(deleteTarget);
+      toast.success("File deleted from Drive");
+      setDeleteTarget(null);
+      refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  if (subjects.length === 0) {
+    return (
+      <div>
+        <SectionHeader title="Upload Materials" />
+        <EmptyState
+          icon={<FiLock />}
+          title="No approved subjects yet"
+          subtitle="Submit a subject request and wait for admin approval before uploading."
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <SectionHeader title="Upload Materials" />
+
+      {/* Course selector */}
+      <div className="mb-6 flex flex-wrap gap-2">
+        {subjects.map((s) => (
+          <button
+            key={s.courseCode}
+            onClick={() => setSelectedCourse(s.courseCode)}
+            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              selectedCourse === s.courseCode
+                ? "bg-indigo-600 text-white"
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+            }`}
+          >
+            <FiFolder size={14} />
+            {s.subjectName} ({s.courseCode})
+          </button>
+        ))}
+      </div>
+
+      {!selectedCourse ? (
+        <EmptyState
+          icon={<FiFolder />}
+          title="Select a subject"
+          subtitle="Choose an approved subject above to upload or view files."
+        />
+      ) : (
+        <>
+          {/* Upload zone */}
+          <div className="mb-6">
+            <UploadZone onFilesSelected={handleUpload} uploading={uploading} />
+
+            {uploading && uploadProgress && (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <FiLoader className="animate-spin text-indigo-500" />
+                    <span>
+                      Uploading {Math.min(uploadProgress.completedFiles + 1, uploadProgress.totalFiles)}/
+                      {uploadProgress.totalFiles}: {uploadProgress.currentFileName}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={handleCancelUpload}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                  >
+                    Cancel Upload
+                  </button>
+                </div>
+
+                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-indigo-500 transition-all"
+                    style={{ width: `${Math.min(uploadProgress.overallProgress, 100)}%` }}
+                  />
+                </div>
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Overall {uploadProgress.overallProgress}% · Current file {uploadProgress.currentFileProgress}% · ETA {formatEta(uploadProgress.etaSeconds)}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Existing files */}
+          <SectionHeader title={`Files in ${selectedCourse}`} />
+          {files.length === 0 ? (
+            <EmptyState title="No files yet" subtitle="Upload your first file above." />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {files.map((f) => (
+                <FileCard
+                  key={f.id}
+                  file={f}
+                  onDelete={(id) => setDeleteTarget(id)}
+                  onDownload={handleDownload}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      <ConfirmModal
+        open={!!deleteTarget}
+        title="Delete File"
+        message="Are you sure you want to delete this file? It will also be removed from Google Drive."
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        danger
+        onConfirm={handleDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </div>
+  );
+}
