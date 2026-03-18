@@ -1,0 +1,9 @@
+1:"$Sreact.fragment"
+2:I[71879,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/7793f75598456c50.js"],"ClientPageRoot"]
+3:I[17284,["/coursedrop/_next/static/chunks/568a04fede6f43c3.js","/coursedrop/_next/static/chunks/91ad32430cb01ad5.js","/coursedrop/_next/static/chunks/1b5390f185744295.js"],"default"]
+6:I[26295,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/7793f75598456c50.js"],"OutletBoundary"]
+7:"$Sreact.suspense"
+0:{"buildId":"fdqVmOirOtMkH7hubBcVw","rsc":["$","$1","c",{"children":[["$","$L2",null,{"Component":"$3","serverProvidedParams":{"searchParams":{},"params":{},"promises":["$@4","$@5"]}}],[["$","script","script-0",{"src":"/coursedrop/_next/static/chunks/91ad32430cb01ad5.js","async":true}],["$","script","script-1",{"src":"/coursedrop/_next/static/chunks/1b5390f185744295.js","async":true}]],["$","$L6",null,{"children":["$","$7",null,{"name":"Next.MetadataOutlet","children":"$@8"}]}]]}],"loading":null,"isPartial":false}
+4:{}
+5:"$0:rsc:props:children:0:props:serverProvidedParams:params"
+8:null
