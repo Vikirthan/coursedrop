@@ -6,6 +6,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { FiArrowRight, FiCheckCircle } from "react-icons/fi";
+import { isGithubPagesRuntime } from "@/lib/runtime";
 
 export default function TeacherRegisterPage() {
   const [fullName, setFullName] = useState("");
@@ -22,6 +23,13 @@ export default function TeacherRegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (isGithubPagesRuntime()) {
+      setError(
+        "Teacher registration needs backend APIs and is disabled on GitHub Pages. Deploy to Vercel for full functionality."
+      );
+      return;
+    }
 
     if (!fullName.trim()) {
       setError("Full name is required");
@@ -64,7 +72,14 @@ export default function TeacherRegisterPage() {
         setError("Username or email already registered");
       } else {
         const data = await res.json();
-        setError(data.error || "Registration failed. Please try again.");
+        const message = data.error || "Registration failed. Please try again.";
+        if (message.includes("Missing Supabase configuration")) {
+          setError(
+            "Server is missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your hosting dashboard, then redeploy."
+          );
+        } else {
+          setError(message);
+        }
       }
     } catch (err) {
       setError("Network error. Please try again.");

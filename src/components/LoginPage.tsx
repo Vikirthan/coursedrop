@@ -3,10 +3,11 @@
 // CourseDrop — Shared Login Page Component
 // ============================================================
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ADMIN_ID, ADMIN_PASSWORD } from "@/lib/mockData";
+import { isGithubPagesRuntime } from "@/lib/runtime";
 import Link from "next/link";
 import { FiLogIn, FiLoader } from "react-icons/fi";
 
@@ -21,6 +22,11 @@ export default function LoginPage({ role }: LoginPageProps) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isGithubPages, setIsGithubPages] = useState(false);
+
+  useEffect(() => {
+    setIsGithubPages(isGithubPagesRuntime());
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +79,13 @@ export default function LoginPage({ role }: LoginPageProps) {
             </p>
           )}
         </div>
+
+        {!isAdmin && isGithubPages && (
+          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
+            Teacher login requires backend APIs and is not available on GitHub Pages.
+            Use a server deployment like Vercel for full functionality.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

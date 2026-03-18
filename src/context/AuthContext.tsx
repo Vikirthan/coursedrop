@@ -6,6 +6,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@/lib/types";
 import { CREDENTIALS, DUMMY_USERS } from "@/lib/mockData";
+import { isGithubPagesRuntime } from "@/lib/runtime";
 
 interface AuthState {
   user: User | null;
@@ -53,6 +54,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return null;
     }
 
+    if (isGithubPagesRuntime()) {
+      return "Teacher login needs backend APIs and is disabled on GitHub Pages. Deploy to Vercel for full login support.";
+    }
+
     try {
       const res = await fetch("/api/auth/teacher/login", {
         method: "POST",
@@ -62,7 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const data = (await res.json()) as { error?: string; user?: User };
       if (!res.ok) {
-        return data.error ?? "Login failed";
+        const message = data.error ?? "Login failed";
+        if (message.includes("Missing Supabase configuration")) {
+          return "Server is missing Supabase environment variables. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your hosting dashboard, then redeploy.";
+        }
+        return message;
       }
 
       if (!data.user) {
