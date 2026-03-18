@@ -21,6 +21,36 @@ function isNoRowsError(code?: string): boolean {
   return code === "PGRST116";
 }
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error && err.message.trim()) {
+    return err.message;
+  }
+
+  if (err && typeof err === "object") {
+    const maybe = err as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+
+    const parts = [maybe.message, maybe.details, maybe.hint].filter(
+      (value): value is string =>
+        typeof value === "string" && value.trim().length > 0
+    );
+
+    if (parts.length > 0) {
+      return parts.join(" ");
+    }
+
+    if (typeof maybe.code === "string" && maybe.code.trim()) {
+      return `Supabase error (${maybe.code})`;
+    }
+  }
+
+  return "Unknown error";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Partial<TeacherLoginPayload>;
@@ -75,7 +105,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("[auth/teacher/login] Error:", err);
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = getErrorMessage(err);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

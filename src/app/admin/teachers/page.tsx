@@ -57,10 +57,15 @@ export default function AdminTeachersPage() {
       const res = await fetch("/api/admin/teachers", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacher_id: teacherId, approved: true }),
+        body: JSON.stringify({ id: teacherId, approved: true }),
       });
       if (res.ok) {
         await fetchTeachers();
+      } else {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        console.error("Error approving teacher:", data.error ?? "Request failed");
       }
     } catch (err) {
       console.error("Error approving teacher:", err);
@@ -75,10 +80,15 @@ export default function AdminTeachersPage() {
       const res = await fetch("/api/admin/teachers", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ teacher_id: teacherId, approved: false }),
+        body: JSON.stringify({ id: teacherId, approved: false }),
       });
       if (res.ok) {
         await fetchTeachers();
+      } else {
+        const data = (await res.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        console.error("Error revoking teacher:", data.error ?? "Request failed");
       }
     } catch (err) {
       console.error("Error revoking teacher:", err);
