@@ -5,9 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:gh-pages": "node scripts/build-gh-pages.mjs",
     "start": "next start",
     "lint": "eslint",
-    "deploy": "npm run build && gh-pages -d .next"
+    "deploy": "npm run deploy:gh-pages",
+    "deploy:gh-pages": "npm run build:gh-pages && gh-pages -d out"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.99.2",

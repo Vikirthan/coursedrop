@@ -6,6 +6,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { ADMIN_ID, ADMIN_PASSWORD } from "@/lib/mockData";
 import Link from "next/link";
 import { FiLogIn, FiLoader } from "react-icons/fi";
 
@@ -60,9 +61,9 @@ export default function LoginPage({ role }: LoginPageProps) {
           </h1>
           {isAdmin && (
             <p className="mt-1 text-sm text-slate-400">
-              Use dummy credentials:{" "}
+              Use admin credentials:{" "}
               <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-600">
-                admin / admin123
+                {ADMIN_ID} / {ADMIN_PASSWORD}
               </code>
             </p>
           )}
@@ -76,13 +77,13 @@ export default function LoginPage({ role }: LoginPageProps) {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-600">
-              {isAdmin ? "Username" : "Username or Email"}
+              {isAdmin ? "Admin ID" : "Username or Email"}
             </label>
             <input
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              placeholder={isAdmin ? "Enter username" : "username or email"}
+              placeholder={isAdmin ? "Enter admin ID" : "username or email"}
               required
             />
           </div>

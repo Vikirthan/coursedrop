@@ -3,6 +3,9 @@
 // ============================================================
 import { SubjectRequest, StudyFile, User } from "./types";
 
+export const ADMIN_ID = "12307334";
+export const ADMIN_PASSWORD = "Vikirthan@819";
+
 // ---- Dummy Users ----
 export const DUMMY_USERS: User[] = [
   {
@@ -22,9 +25,9 @@ export const DUMMY_USERS: User[] = [
   },
 ];
 
-// Dummy credentials (admin / admin123, teacher / teacher123)
+// Demo credentials used by local mock admin login.
 export const CREDENTIALS: Record<string, { password: string; userId: string }> = {
-  admin: { password: "admin123", userId: "admin-1" },
+  [ADMIN_ID]: { password: ADMIN_PASSWORD, userId: "admin-1" },
   teacher: { password: "teacher123", userId: "teacher-1" },
 };
 
