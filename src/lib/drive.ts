@@ -20,7 +20,7 @@ const MASTER_FOLDER_ID = process.env.GOOGLE_DRIVE_MASTER_FOLDER_ID ?? "";
 const SHARED_DRIVE_ID = process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID ?? "";
 const DELEGATED_USER_EMAIL = process.env.GOOGLE_DRIVE_DELEGATED_USER_EMAIL ?? "";
 
-function getDriveClient(): drive_v3.Drive {
+export function getDriveClient(): drive_v3.Drive {
   // Personal Google accounts should use OAuth refresh tokens.
   if (OAUTH_CLIENT_ID && OAUTH_CLIENT_SECRET && OAUTH_REFRESH_TOKEN) {
     const auth = new google.auth.OAuth2(OAUTH_CLIENT_ID, OAUTH_CLIENT_SECRET);

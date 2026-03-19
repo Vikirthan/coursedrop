@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compare } from "bcryptjs";
-import { google } from "googleapis";
+import { getDriveClient } from "@/lib/drive";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { ADMIN_PASSWORD } from "@/lib/mockData";
 
@@ -35,24 +35,6 @@ function getErrorMessage(err: unknown): string {
     }
   }
   return "Unknown error";
-}
-
-async function getDriveAuth() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const keyStr = process.env.GOOGLE_PRIVATE_KEY;
-
-  if (!email || !keyStr) {
-    throw new Error("Missing Google Drive configuration");
-  }
-
-  const key = keyStr.replace(/\\n/g, "\n");
-  const auth = new google.auth.JWT({
-    email,
-    key,
-    scopes: ["https://www.googleapis.com/auth/drive"],
-  });
-
-  return { auth };
 }
 
 export async function DELETE(req: NextRequest) {
@@ -118,34 +100,41 @@ export async function DELETE(req: NextRequest) {
       }
     }
 
-    // Delete folder from Google Drive
-    const { auth } = await getDriveAuth();
-    const drive = google.drive({ version: "v3", auth });
+    // Delete folder from Google Drive using shared auth logic.
+    const drive = getDriveClient();
 
     // Recursively delete all files and subfolders
     async function deleteFolderContents(folderId: string): Promise<void> {
-      const res = await drive.files.list({
-        q: `'${folderId}' in parents`,
-        spaces: "drive",
-        pageSize: 100,
-        fields: "files(id, mimeType)",
-        supportsAllDrives: true,
-      });
+      let pageToken: string | undefined;
 
-      const files = res.data.files ?? [];
-      for (const file of files) {
-        if (file.id) {
-          if (file.mimeType === "application/vnd.google-apps.folder") {
-            // Recursively delete subfolder
-            await deleteFolderContents(file.id);
+      do {
+        const res = await drive.files.list({
+          q: `'${folderId}' in parents and trashed = false`,
+          spaces: "drive",
+          pageSize: 1000,
+          fields: "nextPageToken,files(id,mimeType)",
+          supportsAllDrives: true,
+          includeItemsFromAllDrives: true,
+          pageToken,
+        });
+
+        const files = res.data.files ?? [];
+        for (const file of files) {
+          if (file.id) {
+            if (file.mimeType === "application/vnd.google-apps.folder") {
+              // Recursively delete subfolder
+              await deleteFolderContents(file.id);
+            }
+            // Delete file or folder
+            await drive.files.delete({
+              fileId: file.id,
+              supportsAllDrives: true,
+            });
           }
-          // Delete file or folder
-          await drive.files.delete({
-            fileId: file.id,
-            supportsAllDrives: true,
-          });
         }
-      }
+
+        pageToken = res.data.nextPageToken ?? undefined;
+      } while (pageToken);
     }
 
     // Delete all contents

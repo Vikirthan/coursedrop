@@ -76,12 +76,24 @@ RESEND_FROM_EMAIL=
 # Optional display name in email subject
 APP_NAME=CourseDrop
 
-# Google Drive integration
+# Google Drive integration (choose one auth mode)
+# Mode A (personal Gmail): OAuth
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REFRESH_TOKEN=
+
+# Mode B (service account)
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_PRIVATE_KEY=
-GOOGLE_DRIVE_MASTER_FOLDER_ID=
-GOOGLE_DRIVE_SHARED_DRIVE_ID=
 GOOGLE_DRIVE_DELEGATED_USER_EMAIL=
+
+# Required in both modes (folder/root to store course folders)
+GOOGLE_DRIVE_MASTER_FOLDER_ID=
+# Optional fallback root (Shared Drive root)
+GOOGLE_DRIVE_SHARED_DRIVE_ID=
+
+# Optional admin hardening
+ADMIN_DELETE_PASSWORD=
 ```
 
 ## Supabase Tables Required For Cross-Device Sync
