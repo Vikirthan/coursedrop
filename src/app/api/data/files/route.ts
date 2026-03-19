@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { StudyFile } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 type FileRow = {
   id: string;
   name: string;
@@ -55,7 +64,7 @@ function toStudyFile(row: FileRow): StudyFile {
     type: row.type,
     size: row.size,
     section: row.section ?? undefined,
-    courseCode: row.course_code,
+    courseCode: (row.course_code ?? "").toUpperCase(),
     subjectName: row.subject_name,
     uploadedBy: row.uploaded_by,
     uploadedByName: row.uploaded_by_name,
@@ -77,7 +86,7 @@ export async function GET(req: NextRequest) {
       .order("upload_date", { ascending: false });
 
     if (courseCode) {
-      query = query.eq("course_code", courseCode);
+      query = query.ilike("course_code", courseCode);
     }
 
     const { data, error } = await query;
@@ -85,10 +94,16 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ files: (data ?? []).map((row) => toStudyFile(row as FileRow)) });
+    return NextResponse.json(
+      { files: (data ?? []).map((row) => toStudyFile(row as FileRow)) },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/files][GET] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }
 
@@ -113,7 +128,7 @@ export async function POST(req: NextRequest) {
     if (!name || !type || !courseCode || !subjectName || !uploadedBy || !uploadedByName || !driveFileId || !driveDownloadUrl) {
       return NextResponse.json(
         { error: "Missing required file metadata fields" },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -144,10 +159,16 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ file: toStudyFile(data as FileRow) }, { status: 201 });
+    return NextResponse.json(
+      { file: toStudyFile(data as FileRow) },
+      { status: 201, headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/files][POST] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }
 
@@ -159,7 +180,7 @@ export async function DELETE(req: NextRequest) {
     if (!fileId && !courseCode) {
       return NextResponse.json(
         { error: "fileId or courseCode is required" },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -169,7 +190,7 @@ export async function DELETE(req: NextRequest) {
     if (fileId) {
       query = query.eq("id", fileId);
     } else {
-      query = query.eq("course_code", courseCode);
+      query = query.ilike("course_code", courseCode);
     }
 
     const { data, error } = await query.select("id");
@@ -177,9 +198,15 @@ export async function DELETE(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ success: true, deleted: data?.length ?? 0 });
+    return NextResponse.json(
+      { success: true, deleted: data?.length ?? 0 },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/files][DELETE] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

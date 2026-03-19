@@ -16,6 +16,7 @@ import {
   FiFileText,
   FiHome,
   FiAlertCircle,
+  FiEye,
 } from "react-icons/fi";
 
 interface NavItem {
@@ -35,6 +36,7 @@ const adminNav: NavItem[] = [
 const teacherNav: NavItem[] = [
   { label: "Dashboard", href: "/teacher", icon: <FiGrid /> },
   { label: "Upload", href: "/teacher/upload", icon: <FiUploadCloud /> },
+  { label: "Student Preview", href: "/teacher/student-preview", icon: <FiEye /> },
   { label: "My Requests", href: "/teacher/requests", icon: <FiSend /> },
   { label: "Report Bug", href: "/report-bug", icon: <FiAlertCircle /> },
 ];

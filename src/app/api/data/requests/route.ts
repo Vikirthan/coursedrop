@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { RequestStatus, SubjectRequest } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 type RequestRow = {
   id: string;
   teacher_id: string;
@@ -70,14 +79,32 @@ function isValidStatus(value: string): value is RequestStatus {
   return VALID_STATUSES.includes(value as RequestStatus);
 }
 
+function parseCsvValues(raw: string): string[] {
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((value) => value.trim())
+        .filter((value) => value.length > 0)
+    )
+  );
+}
+
 export async function GET(req: NextRequest) {
   try {
-    const teacherId = (req.nextUrl.searchParams.get("teacherId") ?? "").trim();
+    const teacherIdRaw = (req.nextUrl.searchParams.get("teacherId") ?? "").trim();
+    const teacherIds = parseCsvValues(teacherIdRaw);
+    const teacherEmails = parseCsvValues(
+      (req.nextUrl.searchParams.get("teacherEmail") ?? "").trim().toLowerCase()
+    );
     const courseCode = (req.nextUrl.searchParams.get("courseCode") ?? "").trim().toUpperCase();
     const statusRaw = (req.nextUrl.searchParams.get("status") ?? "").trim().toLowerCase();
 
     if (statusRaw && !isValidStatus(statusRaw)) {
-      return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid status filter" },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const supabase = getSupabaseAdminClient();
@@ -86,11 +113,8 @@ export async function GET(req: NextRequest) {
       .select("id,teacher_id,teacher_name,teacher_email,department,subject_name,course_code,message,status,created_at,updated_at,drive_folder_id")
       .order("created_at", { ascending: false });
 
-    if (teacherId) {
-      query = query.eq("teacher_id", teacherId);
-    }
     if (courseCode) {
-      query = query.eq("course_code", courseCode);
+      query = query.ilike("course_code", courseCode);
     }
     if (statusRaw) {
       query = query.eq("status", statusRaw);
@@ -101,10 +125,33 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ requests: (data ?? []).map(toSubjectRequest) });
+    const rows = (data ?? []) as RequestRow[];
+    const teacherIdSet = new Set(teacherIds);
+    const teacherEmailSet = new Set(teacherEmails);
+
+    const filteredRows = rows.filter((row) => {
+      if (teacherIdSet.size === 0 && teacherEmailSet.size === 0) {
+        return true;
+      }
+
+      const matchesTeacherId = teacherIdSet.has(row.teacher_id);
+      const matchesTeacherEmail = teacherEmailSet.has(
+        (row.teacher_email ?? "").toLowerCase()
+      );
+
+      return matchesTeacherId || matchesTeacherEmail;
+    });
+
+    return NextResponse.json(
+      { requests: filteredRows.map(toSubjectRequest) },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/requests][GET] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }
 
@@ -123,7 +170,7 @@ export async function POST(req: NextRequest) {
     if (!teacherId || !teacherName || !teacherEmail || !department || !subjectName || !courseCode) {
       return NextResponse.json(
         { error: "teacherId, teacherName, teacherEmail, department, subjectName, and courseCode are required" },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -154,10 +201,16 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ request: toSubjectRequest(data as RequestRow) }, { status: 201 });
+    return NextResponse.json(
+      { request: toSubjectRequest(data as RequestRow) },
+      { status: 201, headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/requests][POST] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }
 
@@ -179,7 +232,10 @@ export async function PATCH(req: NextRequest) {
 
     if (typeof body.status === "string") {
       if (!isValidStatus(body.status)) {
-        return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid status value" },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
       }
       updateData.status = body.status;
     }
@@ -192,7 +248,7 @@ export async function PATCH(req: NextRequest) {
     if (Object.keys(updateData).length === 1) {
       return NextResponse.json(
         { error: "Nothing to update. Provide status and/or driveFolderId." },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
@@ -210,20 +266,23 @@ export async function PATCH(req: NextRequest) {
         throw error;
       }
 
-      return NextResponse.json({ request: toSubjectRequest(data as RequestRow) });
+      return NextResponse.json(
+        { request: toSubjectRequest(data as RequestRow) },
+        { headers: NO_STORE_HEADERS }
+      );
     }
 
     if (!courseCode) {
       return NextResponse.json(
         { error: "id or courseCode is required" },
-        { status: 400 }
+        { status: 400, headers: NO_STORE_HEADERS }
       );
     }
 
-    let query = supabase
+    const query = supabase
       .from("subject_requests")
       .update(updateData)
-      .eq("course_code", courseCode)
+      .ilike("course_code", courseCode)
       .eq("status", "approved");
 
     const { data, error } = await query
@@ -233,9 +292,15 @@ export async function PATCH(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ requests: (data ?? []).map((row) => toSubjectRequest(row as RequestRow)) });
+    return NextResponse.json(
+      { requests: (data ?? []).map((row) => toSubjectRequest(row as RequestRow)) },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/requests][PATCH] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

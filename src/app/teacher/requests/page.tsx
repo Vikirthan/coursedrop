@@ -26,7 +26,16 @@ export default function TeacherRequestsPage() {
   const refresh = async () => {
     if (!user) return;
     try {
-      const next = await apiListRequests({ teacherId: user.id });
+      const teacherKeys = Array.from(
+        new Set([user.id, user.username].map((value) => value?.trim()).filter(Boolean))
+      ) as string[];
+      const teacherEmails = Array.from(
+        new Set([user.email].map((value) => value?.trim().toLowerCase()).filter(Boolean))
+      ) as string[];
+      const next = await apiListRequests({
+        teacherIds: teacherKeys,
+        teacherEmails,
+      });
       setRequests(next);
     } catch (err) {
       console.error(err);

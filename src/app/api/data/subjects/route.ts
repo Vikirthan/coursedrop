@@ -2,6 +2,15 @@ import { NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { Subject } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 type RequestRow = {
   course_code: string;
   subject_name: string;
@@ -66,8 +75,13 @@ export async function GET() {
     const map = new Map<string, { subjectName: string; department: string; fileCount: number }>();
 
     for (const req of (approvedRequests ?? []) as RequestRow[]) {
-      if (!map.has(req.course_code)) {
-        map.set(req.course_code, {
+      const courseCode = (req.course_code ?? "").trim().toUpperCase();
+      if (!courseCode) {
+        continue;
+      }
+
+      if (!map.has(courseCode)) {
+        map.set(courseCode, {
           subjectName: req.subject_name,
           department: req.department,
           fileCount: 0,
@@ -76,11 +90,19 @@ export async function GET() {
     }
 
     for (const file of (files ?? []) as FileRow[]) {
-      const existing = map.get(file.course_code);
+      const courseCode = (file.course_code ?? "").trim().toUpperCase();
+      if (!courseCode) {
+        continue;
+      }
+
+      const existing = map.get(courseCode);
       if (existing) {
         existing.fileCount += 1;
+        if (!existing.subjectName && file.subject_name) {
+          existing.subjectName = file.subject_name;
+        }
       } else {
-        map.set(file.course_code, {
+        map.set(courseCode, {
           subjectName: file.subject_name,
           department: "",
           fileCount: 1,
@@ -97,9 +119,12 @@ export async function GET() {
       }))
       .sort((a, b) => a.subjectName.localeCompare(b.subjectName));
 
-    return NextResponse.json({ subjects });
+    return NextResponse.json({ subjects }, { headers: NO_STORE_HEADERS });
   } catch (err: unknown) {
     console.error("[data/subjects][GET] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

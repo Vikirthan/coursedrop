@@ -86,10 +86,19 @@ export default function TeacherUploadPage() {
   const refresh = async () => {
     if (!user) return;
 
+    const teacherKeys = Array.from(
+      new Set([user.id, user.username].map((value) => value?.trim()).filter(Boolean))
+    ) as string[];
+    const teacherKeySet = new Set(teacherKeys);
+    const teacherEmails = Array.from(
+      new Set([user.email].map((value) => value?.trim().toLowerCase()).filter(Boolean))
+    ) as string[];
+    const teacherEmailSet = new Set(teacherEmails);
+
     try {
       const [approvedRequests, sharedCourseCodes] = await Promise.all([
         apiListRequests({ status: "approved" }),
-        apiGetTeacherSharedCourses(user.id),
+        apiGetTeacherSharedCourses(user.id, user.username, user.email),
       ]);
 
       setAllApprovedRequests(approvedRequests);
@@ -98,7 +107,10 @@ export default function TeacherUploadPage() {
       const accessibleByCourse = new Map<string, SubjectRequest>();
 
       for (const request of approvedRequests) {
-        if (request.teacherId === user.id) {
+        if (
+          teacherKeySet.has(request.teacherId) ||
+          teacherEmailSet.has(request.teacherEmail.trim().toLowerCase())
+        ) {
           ownedCourseSet.add(request.courseCode);
           if (!accessibleByCourse.has(request.courseCode)) {
             accessibleByCourse.set(request.courseCode, request);

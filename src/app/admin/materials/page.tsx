@@ -121,23 +121,42 @@ export default function AdminMaterialsPage() {
     }
   };
 
+  const approvedTeachers = teachers.filter((teacher) => teacher.approved);
+  const teacherIdByUid = new Map(
+    approvedTeachers.map((teacher) => [teacher.uid.trim().toLowerCase(), teacher.id])
+  );
+  const teacherIdByEmail = new Map(
+    approvedTeachers.map((teacher) => [teacher.email.trim().toLowerCase(), teacher.id])
+  );
+  const teacherNameById = new Map(
+    approvedTeachers.map((teacher) => [teacher.id, teacher.full_name])
+  );
+
   const ownerTeacherIds = selectedCourse
     ? Array.from(
         new Set(
           approvedRequests
             .filter((request) => request.courseCode === selectedCourse)
-            .map((request) => request.teacherId)
+            .map((request) => {
+              const teacherId = request.teacherId.trim();
+              const teacherIdLower = teacherId.toLowerCase();
+
+              if (teacherNameById.has(teacherId)) {
+                return teacherId;
+              }
+
+              return (
+                teacherIdByUid.get(teacherIdLower) ??
+                teacherIdByEmail.get(request.teacherEmail.trim().toLowerCase()) ??
+                teacherId
+              );
+            })
         )
       )
     : [];
 
-  const approvedTeachers = teachers.filter((teacher) => teacher.approved);
   const shareCandidates = approvedTeachers.filter(
     (teacher) => !ownerTeacherIds.includes(teacher.id)
-  );
-
-  const teacherNameById = new Map(
-    approvedTeachers.map((teacher) => [teacher.id, teacher.full_name])
   );
 
   const handleToggleTeacher = (teacherId: string) => {

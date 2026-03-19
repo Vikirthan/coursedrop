@@ -29,13 +29,22 @@ export default function TeacherDashboard() {
       return;
     }
 
+    const teacherKeys = Array.from(
+      new Set([user.id, user.username].map((value) => value?.trim()).filter(Boolean))
+    ) as string[];
+    const teacherKeySet = new Set(teacherKeys);
+    const teacherEmails = Array.from(
+      new Set([user.email].map((value) => value?.trim().toLowerCase()).filter(Boolean))
+    ) as string[];
+    const teacherEmailSet = new Set(teacherEmails);
+
     const load = async () => {
       try {
         const [ownRequests, approvedRequests, sharedCourseCodes, files] =
           await Promise.all([
-            apiListRequests({ teacherId: user.id }),
+            apiListRequests({ teacherIds: teacherKeys, teacherEmails }),
             apiListRequests({ status: "approved" }),
-            apiGetTeacherSharedCourses(user.id),
+            apiGetTeacherSharedCourses(user.id, user.username, user.email),
             apiListFiles(),
           ]);
 
@@ -43,7 +52,11 @@ export default function TeacherDashboard() {
 
         const ownApprovedCourses = new Set(
           approvedRequests
-            .filter((request) => request.teacherId === user.id)
+            .filter(
+              (request) =>
+                teacherKeySet.has(request.teacherId) ||
+                teacherEmailSet.has(request.teacherEmail.trim().toLowerCase())
+            )
             .map((request) => request.courseCode)
         );
 

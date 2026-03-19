@@ -22,13 +22,32 @@ function makeQuery(params: Record<string, string | undefined>): string {
   return qs ? `?${qs}` : "";
 }
 
+function normalizeTeacherKeys(keys: Array<string | undefined>): string[] {
+  return Array.from(
+    new Set(keys.map((key) => (key ?? "").trim()).filter((key) => key.length > 0))
+  );
+}
+
 export async function apiListRequests(params?: {
   teacherId?: string;
+  teacherIds?: string[];
+  teacherEmail?: string;
+  teacherEmails?: string[];
   status?: RequestStatus;
   courseCode?: string;
 }): Promise<SubjectRequest[]> {
+  const teacherIds = normalizeTeacherKeys([
+    ...(params?.teacherIds ?? []),
+    params?.teacherId,
+  ]);
+  const teacherEmails = normalizeTeacherKeys([
+    ...(params?.teacherEmails ?? []),
+    params?.teacherEmail,
+  ]).map((email) => email.toLowerCase());
+
   const qs = makeQuery({
-    teacherId: params?.teacherId,
+    teacherId: teacherIds.length > 0 ? teacherIds.join(",") : undefined,
+    teacherEmail: teacherEmails.length > 0 ? teacherEmails.join(",") : undefined,
     status: params?.status,
     courseCode: params?.courseCode,
   });
@@ -117,8 +136,19 @@ export async function apiGetCourseSharing(courseCode: string): Promise<string[]>
   return data.teacherIds ?? [];
 }
 
-export async function apiGetTeacherSharedCourses(teacherId: string): Promise<string[]> {
-  const qs = makeQuery({ teacherId });
+export async function apiGetTeacherSharedCourses(
+  teacherId: string,
+  fallbackTeacherId?: string,
+  fallbackTeacherEmail?: string
+): Promise<string[]> {
+  const teacherIds = normalizeTeacherKeys([
+    teacherId,
+    fallbackTeacherId,
+    fallbackTeacherEmail?.toLowerCase(),
+  ]);
+  const qs = makeQuery({
+    teacherId: teacherIds.length > 0 ? teacherIds.join(",") : undefined,
+  });
   const res = await fetch(`/api/data/sharing${qs}`, { cache: "no-store" });
   const data = await parseJson<{ courseCodes: string[] }>(res);
   return data.courseCodes ?? [];

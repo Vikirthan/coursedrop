@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { BugReport, BugReportStatus } from "@/lib/types";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+const NO_STORE_HEADERS = {
+  "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+  Pragma: "no-cache",
+  Expires: "0",
+};
+
 type BugRow = {
   id: string;
   reporter_name: string;
@@ -71,7 +80,10 @@ export async function GET(req: NextRequest) {
     const statusRaw = (req.nextUrl.searchParams.get("status") ?? "").trim().toLowerCase();
 
     if (statusRaw && !isValidStatus(statusRaw)) {
-      return NextResponse.json({ error: "Invalid status filter" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid status filter" },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const supabase = getSupabaseAdminClient();
@@ -89,10 +101,16 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ reports: (data ?? []).map((row) => toBugReport(row as BugRow)) });
+    return NextResponse.json(
+      { reports: (data ?? []).map((row) => toBugReport(row as BugRow)) },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/bugs][GET] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }
 
@@ -102,7 +120,10 @@ export async function POST(req: NextRequest) {
 
     const message = (body.message ?? "").trim();
     if (!message) {
-      return NextResponse.json({ error: "message is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "message is required" },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const now = new Date().toISOString();
@@ -136,10 +157,16 @@ export async function POST(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ report: toBugReport(data as BugRow) }, { status: 201 });
+    return NextResponse.json(
+      { report: toBugReport(data as BugRow) },
+      { status: 201, headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/bugs][POST] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }
 
@@ -153,7 +180,10 @@ export async function PATCH(req: NextRequest) {
 
     const id = (body.id ?? "").trim();
     if (!id) {
-      return NextResponse.json({ error: "id is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "id is required" },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const updateData: Record<string, string> = {
@@ -162,7 +192,10 @@ export async function PATCH(req: NextRequest) {
 
     if (typeof body.status === "string") {
       if (!isValidStatus(body.status)) {
-        return NextResponse.json({ error: "Invalid status value" }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid status value" },
+          { status: 400, headers: NO_STORE_HEADERS }
+        );
       }
       updateData.status = body.status;
     }
@@ -172,7 +205,10 @@ export async function PATCH(req: NextRequest) {
     }
 
     if (Object.keys(updateData).length === 1) {
-      return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Nothing to update" },
+        { status: 400, headers: NO_STORE_HEADERS }
+      );
     }
 
     const supabase = getSupabaseAdminClient();
@@ -187,9 +223,15 @@ export async function PATCH(req: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ report: toBugReport(data as BugRow) });
+    return NextResponse.json(
+      { report: toBugReport(data as BugRow) },
+      { headers: NO_STORE_HEADERS }
+    );
   } catch (err: unknown) {
     console.error("[data/bugs][PATCH] Error:", err);
-    return NextResponse.json({ error: getErrorMessage(err) }, { status: 500 });
+    return NextResponse.json(
+      { error: getErrorMessage(err) },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 }

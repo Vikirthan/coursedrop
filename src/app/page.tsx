@@ -119,7 +119,8 @@ export default function HomePage() {
 
         {/* ---- Footer ---- */}
         <footer className="border-t border-slate-200 dark:border-slate-700 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm py-6 text-center text-xs text-slate-400 dark:text-slate-500">
-          © {new Date().getFullYear()} CourseDrop — Built for modern education.
+          <p>© {new Date().getFullYear()} CourseDrop — Built for modern education.</p>
+          <p className="mt-1">Created and tested by : Vikirthan T (12307334)</p>
         </footer>
       </div>
 
