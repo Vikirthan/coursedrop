@@ -5,7 +5,8 @@ import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 type TeacherAccountRow = {
   id: string;
   full_name: string;
-  username: string;
+  uid: string;
+  contact: string;
   email: string;
   department: string | null;
   password_hash: string;
@@ -59,18 +60,17 @@ export async function POST(req: NextRequest) {
 
     if (!identifier || !password) {
       return NextResponse.json(
-        { error: "identifier and password are required" },
+        { error: "UID and password are required" },
         { status: 400 }
       );
     }
 
-    const field = identifier.includes("@") ? "email" : "username";
     const supabase = getSupabaseAdminClient();
 
     const { data, error } = await supabase
       .from("teacher_accounts")
-      .select("id,full_name,username,email,department,password_hash,approved")
-      .eq(field, identifier)
+      .select("id,full_name,uid,contact,email,department,password_hash,approved")
+      .eq("uid", identifier)
       .maybeSingle<TeacherAccountRow>();
 
     if (error && !isNoRowsError(error.code)) {
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       user: {
         id: data.id,
-        username: data.username,
+        username: data.uid,
         name: data.full_name,
         role: "teacher",
         email: data.email,

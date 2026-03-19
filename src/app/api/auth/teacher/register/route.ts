@@ -4,7 +4,8 @@ import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 
 interface RegisterTeacherPayload {
   name: string;
-  username: string;
+  uid: string;
+  contact: string;
   email: string;
   password: string;
   department?: string;
@@ -14,7 +15,7 @@ function isNoRowsError(code?: string): boolean {
   return code === "PGRST116";
 }
 
-function normalizeUsername(value: string): string {
+function normalizeUid(value: string): string {
   return value.trim().toLowerCase();
 }
 
@@ -57,14 +58,15 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Partial<RegisterTeacherPayload>;
 
     const name = (body.name ?? "").trim();
-    const username = normalizeUsername(body.username ?? "");
+    const uid = normalizeUid(body.uid ?? "");
+    const contact = (body.contact ?? "").trim();
     const email = normalizeEmail(body.email ?? "");
     const password = body.password ?? "";
     const department = (body.department ?? "").trim();
 
-    if (!name || !username || !email || !password) {
+    if (!name || !uid || !contact || !email || !password) {
       return NextResponse.json(
-        { error: "name, username, email, and password are required" },
+        { error: "name, uid, contact, email, and password are required" },
         { status: 400 }
       );
     }
@@ -84,12 +86,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const usernameRegex = /^[a-z0-9._-]{3,32}$/;
-    if (!usernameRegex.test(username)) {
+    const uidRegex = /^[a-z0-9._-]{5,20}$/i;
+    if (!uidRegex.test(uid)) {
       return NextResponse.json(
         {
           error:
-            "Username must be 3-32 characters and contain only lowercase letters, numbers, dot, underscore, or hyphen",
+            "UID must be 5-20 characters and contain only letters, numbers, underscore, or hyphen",
         },
         { status: 400 }
       );
@@ -97,19 +99,19 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabaseAdminClient();
 
-    const { data: existingUsername, error: existingUsernameErr } = await supabase
+    const { data: existingUid, error: existingUidErr } = await supabase
       .from("teacher_accounts")
       .select("id")
-      .eq("username", username)
+      .eq("uid", uid)
       .maybeSingle();
 
-    if (existingUsernameErr && !isNoRowsError(existingUsernameErr.code)) {
-      throw existingUsernameErr;
+    if (existingUidErr && !isNoRowsError(existingUidErr.code)) {
+      throw existingUidErr;
     }
 
-    if (existingUsername) {
+    if (existingUid) {
       return NextResponse.json(
-        { error: "Username is already taken" },
+        { error: "UID is already taken" },
         { status: 409 }
       );
     }
@@ -135,7 +137,8 @@ export async function POST(req: NextRequest) {
 
     const { error: insertErr } = await supabase.from("teacher_accounts").insert({
       full_name: name,
-      username,
+      uid,
+      contact,
       email,
       department: department || null,
       password_hash: passwordHash,

@@ -114,17 +114,17 @@ export default function LoginPage({ role }: LoginPageProps) {
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Identifier input */}
+            {/* UID input */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {isAdmin ? "Admin ID" : "Username or Email"}
+                {isAdmin ? "Admin ID" : "UID (Unique ID)"}
               </label>
               <div className="relative">
                 <input
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
-                  placeholder={isAdmin ? "Enter admin ID" : "username or email"}
+                  placeholder={isAdmin ? "Enter admin ID" : "Enter your UID"}
                   required
                   disabled={loading}
                 />
@@ -195,6 +195,16 @@ export default function LoginPage({ role }: LoginPageProps) {
                   className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline transition-colors"
                 >
                   Create one
+                </Link>
+              </p>
+            )}
+            {!isAdmin && (
+              <p className="text-slate-600 dark:text-slate-400">
+                <Link
+                  href="/forgot-password"
+                  className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline transition-colors"
+                >
+                  Forgot password?
                 </Link>
               </p>
             )}

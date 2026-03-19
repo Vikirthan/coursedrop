@@ -18,8 +18,9 @@ import { StudyFile, SubjectRequest } from "@/lib/types";
 import { SectionHeader, EmptyState } from "@/components/ui";
 import UploadZone from "@/components/UploadZone";
 import FileCard from "@/components/FileCard";
+import PasswordModal from "@/components/PasswordModal";
 import ConfirmModal from "@/components/ConfirmModal";
-import { FiFolder, FiLock, FiLoader } from "react-icons/fi";
+import { FiFolder, FiLock, FiLoader, FiTrash2 } from "react-icons/fi";
 import { uid } from "@/lib/utils";
 import toast from "react-hot-toast";
 
@@ -72,6 +73,9 @@ export default function TeacherUploadPage() {
   );
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [deleteFolderLoading, setDeleteFolderLoading] = useState(false);
+  const [deleteFolderError, setDeleteFolderError] = useState("");
   const activeUploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const cancelUploadRef = useRef(false);
 
@@ -328,7 +332,60 @@ export default function TeacherUploadPage() {
     }
   };
 
-  if (subjects.length === 0) {
+  const handleDeleteFolderClick = () => {
+    if (!selectedCourse) {
+      toast.error("Please select a subject first");
+      return;
+    }
+    setShowPasswordModal(true);
+    setDeleteFolderError("");
+  };
+
+  const handleDeleteFolderConfirm = async (password: string) => {
+    if (!selectedCourse || !user) {
+      toast.error("Invalid selection");
+      return;
+    }
+
+    const folderId = getDriveFolderId(selectedCourse);
+    if (!folderId) {
+      toast.error("No folder to delete");
+      setShowPasswordModal(false);
+      return;
+    }
+
+    setDeleteFolderLoading(true);
+    setDeleteFolderError("");
+
+    try {
+      const res = await fetch("/api/drive/delete-folder", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderId,
+          teacherId: user.id,
+          password,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to delete folder");
+      }
+
+      toast.success("Folder and all contents deleted successfully");
+      setShowPasswordModal(false);
+      setSelectedCourse(null);
+      refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "An error occurred";
+      setDeleteFolderError(message);
+    } finally {
+      setDeleteFolderLoading(false);
+    }
+  };
+
+  if (!subjects || subjects.length === 0) {
     return (
       <div>
         <SectionHeader title="Upload Materials" />
@@ -346,21 +403,33 @@ export default function TeacherUploadPage() {
       <SectionHeader title="Upload Materials" />
 
       {/* Course selector */}
-      <div className="mb-6 flex flex-wrap gap-2">
-        {subjects.map((s) => (
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-2">
+          {subjects.map((s) => (
+            <button
+              key={s.courseCode}
+              onClick={() => setSelectedCourse(s.courseCode)}
+              className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                selectedCourse === s.courseCode
+                  ? "bg-indigo-600 text-white"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              }`}
+            >
+              <FiFolder size={14} />
+              {s.subjectName} ({s.courseCode})
+            </button>
+          ))}
+        </div>
+
+        {selectedCourse && (
           <button
-            key={s.courseCode}
-            onClick={() => setSelectedCourse(s.courseCode)}
-            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${
-              selectedCourse === s.courseCode
-                ? "bg-indigo-600 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-            }`}
+            onClick={handleDeleteFolderClick}
+            className="flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-950/30 px-4 py-2 text-sm font-semibold text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
           >
-            <FiFolder size={14} />
-            {s.subjectName} ({s.courseCode})
+            <FiTrash2 size={16} />
+            Delete Folder
           </button>
-        ))}
+        )}
       </div>
 
       {!selectedCourse ? (
@@ -435,6 +504,19 @@ export default function TeacherUploadPage() {
         danger
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <PasswordModal
+        isOpen={showPasswordModal}
+        title="Delete Subject Folder"
+        description="Confirm with your password to delete this subject folder and all its contents from Google Drive. This action cannot be undone."
+        onConfirm={handleDeleteFolderConfirm}
+        onCancel={() => {
+          setShowPasswordModal(false);
+          setDeleteFolderError("");
+        }}
+        isLoading={deleteFolderLoading}
+        error={deleteFolderError}
       />
     </div>
   );

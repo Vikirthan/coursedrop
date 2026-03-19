@@ -42,7 +42,7 @@ export async function GET() {
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("teacher_accounts")
-      .select("id,full_name,username,email,department,approved,created_at,approved_at")
+      .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -75,7 +75,7 @@ export async function PATCH(req: NextRequest) {
         approved_at: approved ? new Date().toISOString() : null,
       })
       .eq("id", id)
-      .select("id,full_name,username,email,department,approved,created_at,approved_at")
+      .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
       .single();
 
     if (error) {

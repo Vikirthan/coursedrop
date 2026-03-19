@@ -11,15 +11,18 @@ import ThemeToggle from "@/components/ThemeToggle";
 
 export default function TeacherRegisterPage() {
   const [fullName, setFullName] = useState("");
-  const [username, setUsername] = useState("");
+  const [uid, setUid] = useState("");
+  const [contact, setContact] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
   const [department, setDepartment] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const validatePassword = (pwd: string) => pwd.length >= 8;
+  const validateUid = (u: string) => /^[a-zA-Z0-9_-]{5,20}$/.test(u);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,8 +39,16 @@ export default function TeacherRegisterPage() {
       setError("Full name is required");
       return;
     }
-    if (!username.trim()) {
-      setError("Username is required");
+    if (!uid.trim()) {
+      setError("UID is required");
+      return;
+    }
+    if (!validateUid(uid)) {
+      setError("UID must be 5-20 characters (letters, numbers, underscore, hyphen only)");
+      return;
+    }
+    if (!contact.trim()) {
+      setError("Contact number is required");
       return;
     }
     if (!email.trim() || !email.includes("@")) {
@@ -46,6 +57,10 @@ export default function TeacherRegisterPage() {
     }
     if (!validatePassword(password)) {
       setError("Password must be at least 8 characters");
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError("Passwords do not match");
       return;
     }
     if (!department) {
@@ -60,7 +75,8 @@ export default function TeacherRegisterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: fullName,
-          username,
+          uid,
+          contact,
           email,
           password,
           department,
@@ -70,7 +86,7 @@ export default function TeacherRegisterPage() {
       if (res.status === 201) {
         setSuccess(true);
       } else if (res.status === 409) {
-        setError("Username or email already registered");
+        setError("UID or email already registered");
       } else {
         const data = await res.json();
         const message = data.error || "Registration failed. Please try again.";
@@ -198,25 +214,41 @@ export default function TeacherRegisterPage() {
               />
             </div>
 
-            {/* Username */}
+            {/* UID */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Username *
+                UID (Unique ID for Login) *
               </label>
               <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                value={uid}
+                onChange={(e) => setUid(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
-                placeholder="johndoe"
+                placeholder="john_doe_123"
+                required
+                disabled={loading}
+              />
+              <p className="text-xs text-slate-500 dark:text-slate-400">5-20 characters: letters, numbers, underscore, hyphen</p>
+            </div>
+
+            {/* Contact */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Contact Number *
+              </label>
+              <input
+                value={contact}
+                onChange={(e) => setContact(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
+                placeholder="+91 9876543210"
                 required
                 disabled={loading}
               />
             </div>
 
-            {/* Email */}
+            {/* Gmail */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                Email *
+                Gmail / Email *
               </label>
               <input
                 type="email"
@@ -244,8 +276,29 @@ export default function TeacherRegisterPage() {
                 disabled={loading}
               />
               {password && !validatePassword(password) && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400 font-medium">
+                <p className="text-xs text-red-600 dark:text-red-400 font-medium">
                   Password must be at least 8 characters
+                </p>
+              )}
+            </div>
+
+            {/* Re-enter Password */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Re-Enter Password *
+              </label>
+              <input
+                type="password"
+                value={passwordConfirm}
+                onChange={(e) => setPasswordConfirm(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
+                placeholder="••••••••"
+                required
+                disabled={loading}
+              />
+              {passwordConfirm && password !== passwordConfirm && (
+                <p className="text-xs text-red-600 dark:text-red-400 font-medium">
+                  Passwords do not match
                 </p>
               )}
             </div>
@@ -295,7 +348,7 @@ export default function TeacherRegisterPage() {
                   <span>Creating Account...</span>
                 </>
               ) : (
-                <span>Create Account</span>
+                <span>Submit</span>
               )}
             </button>
           </form>

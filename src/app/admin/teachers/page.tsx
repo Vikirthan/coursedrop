@@ -12,7 +12,8 @@ import { FiCheckCircle, FiXCircle, FiRefreshCw, FiArrowLeft } from "react-icons/
 interface Teacher {
   id: string;
   full_name: string;
-  username: string;
+  uid: string;
+  contact: string;
   email: string;
   department: string;
   approved: boolean;
@@ -194,22 +195,20 @@ export default function AdminTeachersPage() {
                     </h3>
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-slate-600">
                       <div>
-                        <p className="text-xs font-medium text-slate-500">Username</p>
-                        <p className="font-mono">{teacher.username}</p>
+                        <p className="text-xs font-medium text-slate-500">UID</p>
+                        <p className="font-mono">{teacher.uid}</p>
                       </div>
                       <div>
                         <p className="text-xs font-medium text-slate-500">Email</p>
                         <p>{teacher.email}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-slate-500">Department</p>
-                        <p>{teacher.department}</p>
+                        <p className="text-xs font-medium text-slate-500">Contact</p>
+                        <p>{teacher.contact}</p>
                       </div>
                       <div>
-                        <p className="text-xs font-medium text-slate-500">
-                          {teacher.approved ? "Approved" : "Requested"}
-                        </p>
-                        <p>{formatDate(teacher.approved ? teacher.approved_at || teacher.created_at : teacher.created_at)}</p>
+                        <p className="text-xs font-medium text-slate-500">Department</p>
+                        <p>{teacher.department}</p>
                       </div>
                     </div>
                   </div>
