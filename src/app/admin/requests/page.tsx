@@ -4,7 +4,7 @@
 // ============================================================
 
 import React, { useEffect, useState } from "react";
-import { getRequests, updateRequestStatus } from "@/lib/store";
+import { getRequests, getDriveFolderId, updateRequestStatus } from "@/lib/store";
 import { SubjectRequest } from "@/lib/types";
 import { SectionHeader, StatusChip, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
@@ -29,21 +29,25 @@ export default function AdminRequestsPage() {
       let folderId: string | undefined;
 
       if (action === "approved") {
-        // Create a Google Drive folder for this subject
-        const res = await fetch("/api/drive/folder", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            subjectName: req.subjectName,
-            courseCode: req.courseCode,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Failed to create Drive folder");
+        folderId = getDriveFolderId(req.courseCode);
+
+        if (!folderId) {
+          // Create a Google Drive folder only once per approved course.
+          const res = await fetch("/api/drive/folder", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              subjectName: req.subjectName,
+              courseCode: req.courseCode,
+            }),
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || "Failed to create Drive folder");
+          }
+          const data = await res.json();
+          folderId = data.folderId;
         }
-        const data = await res.json();
-        folderId = data.folderId;
       }
 
       updateRequestStatus(req.id, action, folderId);

@@ -7,7 +7,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getApprovedSubjects,
+  getAccessibleSubjects,
+  getOwnedApprovedCourseCodes,
   getFilesByCourse,
   addFile,
   deleteFile,
@@ -65,6 +66,7 @@ function formatEta(seconds: number | null): string {
 export default function TeacherUploadPage() {
   const { user } = useAuth();
   const [subjects, setSubjects] = useState<SubjectRequest[]>([]);
+  const [ownedCourseCodes, setOwnedCourseCodes] = useState<string[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [files, setFiles] = useState<StudyFile[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -81,9 +83,20 @@ export default function TeacherUploadPage() {
 
   const refresh = () => {
     if (!user) return;
-    const s = getApprovedSubjects(user.id);
+    const owned = getOwnedApprovedCourseCodes(user.id);
+    setOwnedCourseCodes(owned);
+
+    const s = getAccessibleSubjects(user.id);
     setSubjects(s);
-    if (selectedCourse) setFiles(getFilesByCourse(selectedCourse));
+    if (selectedCourse) {
+      const stillAccessible = s.some((subject) => subject.courseCode === selectedCourse);
+      if (!stillAccessible) {
+        setSelectedCourse(null);
+        setFiles([]);
+      } else {
+        setFiles(getFilesByCourse(selectedCourse));
+      }
+    }
   };
 
   useEffect(refresh, [user, selectedCourse]);
@@ -307,6 +320,18 @@ export default function TeacherUploadPage() {
     setDeleting(true);
 
     const file = files.find((f) => f.id === deleteTarget);
+    const canDelete =
+      !!file &&
+      !!user &&
+      (file.uploadedBy === user.id || ownedCourseCodes.includes(file.courseCode));
+
+    if (!canDelete) {
+      toast.error("You can only delete your own files unless you own the subject.");
+      setDeleting(false);
+      setDeleteTarget(null);
+      return;
+    }
+
     try {
       // Delete from Google Drive
       if (file && file.driveFileId && !file.driveFileId.startsWith("mock-")) {
@@ -337,6 +362,10 @@ export default function TeacherUploadPage() {
       toast.error("Please select a subject first");
       return;
     }
+    if (!ownedCourseCodes.includes(selectedCourse)) {
+      toast.error("Only the subject owner can delete this folder.");
+      return;
+    }
     setShowPasswordModal(true);
     setDeleteFolderError("");
   };
@@ -344,6 +373,11 @@ export default function TeacherUploadPage() {
   const handleDeleteFolderConfirm = async (password: string) => {
     if (!selectedCourse || !user) {
       toast.error("Invalid selection");
+      return;
+    }
+
+    if (!ownedCourseCodes.includes(selectedCourse)) {
+      toast.error("Only the subject owner can delete this folder.");
       return;
     }
 
@@ -398,6 +432,9 @@ export default function TeacherUploadPage() {
     );
   }
 
+  const isOwnedSelectedCourse =
+    !!selectedCourse && ownedCourseCodes.includes(selectedCourse);
+
   return (
     <div>
       <SectionHeader title="Upload Materials" />
@@ -417,11 +454,16 @@ export default function TeacherUploadPage() {
             >
               <FiFolder size={14} />
               {s.subjectName} ({s.courseCode})
+              {!ownedCourseCodes.includes(s.courseCode) && (
+                <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
+                  Shared
+                </span>
+              )}
             </button>
           ))}
         </div>
 
-        {selectedCourse && (
+        {selectedCourse && isOwnedSelectedCourse && (
           <button
             onClick={handleDeleteFolderClick}
             className="flex items-center gap-2 rounded-lg bg-red-50 dark:bg-red-950/30 px-4 py-2 text-sm font-semibold text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
@@ -431,6 +473,12 @@ export default function TeacherUploadPage() {
           </button>
         )}
       </div>
+
+      {selectedCourse && !isOwnedSelectedCourse && (
+        <p className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-medium text-indigo-700">
+          Shared access: you can upload and view files for this subject, but folder deletion is restricted to the owner.
+        </p>
+      )}
 
       {!selectedCourse ? (
         <EmptyState
@@ -487,7 +535,11 @@ export default function TeacherUploadPage() {
                 <FileCard
                   key={f.id}
                   file={f}
-                  onDelete={(id) => setDeleteTarget(id)}
+                  onDelete={
+                    f.uploadedBy === user?.id || ownedCourseCodes.includes(f.courseCode)
+                      ? (id) => setDeleteTarget(id)
+                      : undefined
+                  }
                   onDownload={handleDownload}
                 />
               ))}

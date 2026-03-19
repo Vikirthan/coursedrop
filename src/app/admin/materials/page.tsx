@@ -4,19 +4,40 @@
 // ============================================================
 
 import React, { useEffect, useState } from "react";
-import { getAllSubjects, getFilesByCourse, deleteFile } from "@/lib/store";
+import {
+  getAllSubjects,
+  getFilesByCourse,
+  deleteFile,
+  getOwnerTeacherIdsForCourse,
+  getSharedTeacherIdsForCourse,
+  setSharedTeacherIdsForCourse,
+} from "@/lib/store";
 import { StudyFile, Subject } from "@/lib/types";
 import { SectionHeader, EmptyState } from "@/components/ui";
 import FileCard from "@/components/FileCard";
 import ConfirmModal from "@/components/ConfirmModal";
-import { FiFileText, FiFolder } from "react-icons/fi";
+import { FiFileText, FiFolder, FiUsers, FiSave, FiLoader } from "react-icons/fi";
 import toast from "react-hot-toast";
+
+interface TeacherOption {
+  id: string;
+  full_name: string;
+  uid: string;
+  email: string;
+  department: string | null;
+  approved: boolean;
+}
 
 export default function AdminMaterialsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [files, setFiles] = useState<StudyFile[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [teachers, setTeachers] = useState<TeacherOption[]>([]);
+  const [loadingTeachers, setLoadingTeachers] = useState(false);
+  const [sharedTeacherIds, setSharedTeacherIds] = useState<string[]>([]);
+  const [sharingDirty, setSharingDirty] = useState(false);
+  const [savingSharing, setSavingSharing] = useState(false);
 
   const refresh = () => {
     const subs = getAllSubjects();
@@ -26,12 +47,83 @@ export default function AdminMaterialsPage() {
 
   useEffect(refresh, [selectedCourse]);
 
+  useEffect(() => {
+    const fetchTeachers = async () => {
+      setLoadingTeachers(true);
+      try {
+        const res = await fetch("/api/admin/teachers");
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || "Failed to load teachers");
+        }
+        const data = (await res.json()) as { teachers?: TeacherOption[] };
+        setTeachers(data.teachers ?? []);
+      } catch (err) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to load teachers");
+      } finally {
+        setLoadingTeachers(false);
+      }
+    };
+
+    void fetchTeachers();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCourse) {
+      setSharedTeacherIds([]);
+      setSharingDirty(false);
+      return;
+    }
+
+    setSharedTeacherIds(getSharedTeacherIdsForCourse(selectedCourse));
+    setSharingDirty(false);
+  }, [selectedCourse]);
+
   const handleDelete = () => {
     if (!deleteTarget) return;
     deleteFile(deleteTarget);
     toast.success("File deleted");
     setDeleteTarget(null);
     refresh();
+  };
+
+  const ownerTeacherIds = selectedCourse
+    ? getOwnerTeacherIdsForCourse(selectedCourse)
+    : [];
+
+  const approvedTeachers = teachers.filter((teacher) => teacher.approved);
+  const shareCandidates = approvedTeachers.filter(
+    (teacher) => !ownerTeacherIds.includes(teacher.id)
+  );
+
+  const teacherNameById = new Map(
+    approvedTeachers.map((teacher) => [teacher.id, teacher.full_name])
+  );
+
+  const handleToggleTeacher = (teacherId: string) => {
+    setSharingDirty(true);
+    setSharedTeacherIds((prev) =>
+      prev.includes(teacherId)
+        ? prev.filter((id) => id !== teacherId)
+        : [...prev, teacherId]
+    );
+  };
+
+  const handleSaveSharing = () => {
+    if (!selectedCourse) return;
+
+    setSavingSharing(true);
+    try {
+      setSharedTeacherIdsForCourse(selectedCourse, sharedTeacherIds);
+      setSharingDirty(false);
+      toast.success("Teacher sharing updated");
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to update sharing");
+    } finally {
+      setSavingSharing(false);
+    }
   };
 
   return (
@@ -68,6 +160,79 @@ export default function AdminMaterialsPage() {
           </button>
         ))}
       </div>
+
+      {selectedCourse && (
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                <FiUsers /> Sharing for {selectedCourse}
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Owners always have access. Select additional approved teachers who can view and upload files.
+              </p>
+            </div>
+            <button
+              onClick={handleSaveSharing}
+              disabled={!sharingDirty || savingSharing}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {savingSharing ? <FiLoader className="animate-spin" /> : <FiSave />}
+              Save Sharing
+            </button>
+          </div>
+
+          <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <span className="font-semibold text-slate-700">Owners:</span>{" "}
+            {ownerTeacherIds.length === 0
+              ? "No owner detected"
+              : ownerTeacherIds
+                  .map((teacherId) => teacherNameById.get(teacherId) ?? teacherId)
+                  .join(", ")}
+          </div>
+
+          {loadingTeachers ? (
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <FiLoader className="animate-spin" /> Loading teachers...
+            </div>
+          ) : shareCandidates.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              No additional approved teachers available to share with.
+            </p>
+          ) : (
+            <div className="grid gap-2 sm:grid-cols-2">
+              {shareCandidates.map((teacher) => {
+                const checked = sharedTeacherIds.includes(teacher.id);
+                return (
+                  <label
+                    key={teacher.id}
+                    className={`flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-2 text-sm transition ${
+                      checked
+                        ? "border-indigo-300 bg-indigo-50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => handleToggleTeacher(teacher.id)}
+                      className="mt-0.5 h-4 w-4 accent-indigo-600"
+                    />
+                    <span>
+                      <span className="block font-semibold text-slate-700">
+                        {teacher.full_name}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        UID: {teacher.uid} · {teacher.department ?? "No department"}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Files grid */}
       {(selectedCourse ? files : (() => {

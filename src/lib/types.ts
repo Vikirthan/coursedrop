@@ -55,3 +55,9 @@ export interface Subject {
   department: string;
   fileCount: number;
 }
+
+export interface CourseShareAccess {
+  courseCode: string;
+  teacherIds: string[];
+  updatedAt: string;
+}

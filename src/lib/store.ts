@@ -2,11 +2,18 @@
 // CourseDrop — In-memory Store (simulates a DB with localStorage)
 // ============================================================
 
-import { SubjectRequest, StudyFile, RequestStatus, Subject } from "./types";
+import {
+  SubjectRequest,
+  StudyFile,
+  RequestStatus,
+  Subject,
+  CourseShareAccess,
+} from "./types";
 import { SEED_REQUESTS, SEED_FILES } from "./mockData";
 
 const REQUESTS_KEY = "coursedrop_requests";
 const FILES_KEY = "coursedrop_files";
+const COURSE_SHARING_KEY = "coursedrop_course_sharing";
 
 // ---- helpers ----
 function isBrowser() {
@@ -26,6 +33,10 @@ function loadJSON<T>(key: string, fallback: T): T {
 function saveJSON<T>(key: string, data: T) {
   if (!isBrowser()) return;
   localStorage.setItem(key, JSON.stringify(data));
+}
+
+function dedupe(values: string[]): string[] {
+  return Array.from(new Set(values));
 }
 
 // ---- Subject Requests ----
@@ -51,6 +62,12 @@ export function updateRequestStatus(
       : r
   );
   saveJSON(REQUESTS_KEY, all);
+
+  // If a course has no approved request left, remove stale sharing config.
+  const changed = all.find((r) => r.id === id);
+  if (changed && !all.some((r) => r.courseCode === changed.courseCode && r.status === "approved")) {
+    setSharedTeacherIdsForCourse(changed.courseCode, []);
+  }
 }
 
 export function getRequestsByTeacher(teacherId: string): SubjectRequest[] {
@@ -68,6 +85,101 @@ export function getApprovedSubjects(teacherId: string): SubjectRequest[] {
   return getRequests().filter(
     (r) => r.teacherId === teacherId && r.status === "approved"
   );
+}
+
+export function getOwnedApprovedCourseCodes(teacherId: string): string[] {
+  return dedupe(getApprovedSubjects(teacherId).map((r) => r.courseCode));
+}
+
+export function isCourseOwnedByTeacher(
+  courseCode: string,
+  teacherId: string
+): boolean {
+  return getRequests().some(
+    (r) =>
+      r.courseCode === courseCode &&
+      r.teacherId === teacherId &&
+      r.status === "approved"
+  );
+}
+
+export function getOwnerTeacherIdsForCourse(courseCode: string): string[] {
+  return dedupe(
+    getRequests()
+      .filter((r) => r.courseCode === courseCode && r.status === "approved")
+      .map((r) => r.teacherId)
+  );
+}
+
+export function getCourseSharing(): CourseShareAccess[] {
+  return loadJSON<CourseShareAccess[]>(COURSE_SHARING_KEY, []);
+}
+
+export function getSharedTeacherIdsForCourse(courseCode: string): string[] {
+  const entry = getCourseSharing().find((s) => s.courseCode === courseCode);
+  return entry ? dedupe(entry.teacherIds) : [];
+}
+
+export function setSharedTeacherIdsForCourse(
+  courseCode: string,
+  teacherIds: string[]
+) {
+  const ownerIds = new Set(getOwnerTeacherIdsForCourse(courseCode));
+  const normalized = dedupe(teacherIds.filter((id) => id && !ownerIds.has(id)));
+
+  const all = getCourseSharing().filter((s) => s.courseCode !== courseCode);
+  if (normalized.length > 0) {
+    all.push({
+      courseCode,
+      teacherIds: normalized,
+      updatedAt: new Date().toISOString(),
+    });
+  }
+
+  saveJSON(COURSE_SHARING_KEY, all);
+}
+
+export function getSharedCourseCodesForTeacher(teacherId: string): string[] {
+  return dedupe(
+    getCourseSharing()
+      .filter((s) => s.teacherIds.includes(teacherId))
+      .map((s) => s.courseCode)
+  );
+}
+
+export function canTeacherAccessCourse(
+  teacherId: string,
+  courseCode: string
+): boolean {
+  if (isCourseOwnedByTeacher(courseCode, teacherId)) {
+    return true;
+  }
+  return getSharedTeacherIdsForCourse(courseCode).includes(teacherId);
+}
+
+/**
+ * Courses a teacher can access:
+ * - own approved requests
+ * - admin-shared access on approved courses owned by other teachers
+ */
+export function getAccessibleSubjects(teacherId: string): SubjectRequest[] {
+  const approved = getRequests().filter((r) => r.status === "approved");
+  const byCourse = new Map<string, SubjectRequest>();
+
+  for (const own of approved.filter((r) => r.teacherId === teacherId)) {
+    byCourse.set(own.courseCode, own);
+  }
+
+  const sharedCourseCodes = getSharedCourseCodesForTeacher(teacherId);
+  for (const code of sharedCourseCodes) {
+    if (byCourse.has(code)) continue;
+    const sharedSubject = approved.find((r) => r.courseCode === code);
+    if (sharedSubject) {
+      byCourse.set(code, sharedSubject);
+    }
+  }
+
+  return Array.from(byCourse.values());
 }
 
 /** Get the Drive folder ID for a specific course code */
@@ -145,4 +257,5 @@ export function resetStore() {
   if (!isBrowser()) return;
   localStorage.removeItem(REQUESTS_KEY);
   localStorage.removeItem(FILES_KEY);
+  localStorage.removeItem(COURSE_SHARING_KEY);
 }

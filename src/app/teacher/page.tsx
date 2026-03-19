@@ -6,8 +6,8 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
+  getAccessibleSubjects,
   getRequestsByTeacher,
-  getApprovedCourses,
   getFilesByCourse,
 } from "@/lib/store";
 import { SubjectRequest, StudyFile } from "@/lib/types";
@@ -19,20 +19,23 @@ export default function TeacherDashboard() {
   const { user } = useAuth();
   const [requests, setRequests] = useState<SubjectRequest[]>([]);
   const [fileCount, setFileCount] = useState(0);
+  const [accessibleSubjectCount, setAccessibleSubjectCount] = useState(0);
 
   useEffect(() => {
     if (!user) return;
     const reqs = getRequestsByTeacher(user.id);
     setRequests(reqs);
 
-    const approved = getApprovedCourses(user.id);
+    const accessible = getAccessibleSubjects(user.id);
+    setAccessibleSubjectCount(accessible.length);
+
+    const courseCodes = Array.from(new Set(accessible.map((s) => s.courseCode)));
     let count = 0;
-    for (const c of approved) count += getFilesByCourse(c).length;
+    for (const c of courseCodes) count += getFilesByCourse(c).length;
     setFileCount(count);
   }, [user]);
 
   const pending = requests.filter((r) => r.status === "pending").length;
-  const approved = requests.filter((r) => r.status === "approved").length;
 
   return (
     <div>
@@ -57,8 +60,8 @@ export default function TeacherDashboard() {
           accent="amber"
         />
         <StatCard
-          label="Approved Subjects"
-          value={approved}
+          label="Accessible Subjects"
+          value={accessibleSubjectCount}
           icon={<FiCheckCircle />}
           accent="green"
         />
