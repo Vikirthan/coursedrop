@@ -68,6 +68,7 @@ export default function TeacherUploadPage() {
   const [subjects, setSubjects] = useState<SubjectRequest[]>([]);
   const [ownedCourseCodes, setOwnedCourseCodes] = useState<string[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
+  const [section, setSection] = useState("");
   const [files, setFiles] = useState<StudyFile[]>([]);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(
@@ -173,6 +174,7 @@ export default function TeacherUploadPage() {
   const handleUpload = async (fileList: File[]) => {
     if (!selectedCourse || !user) return;
 
+    const normalizedSection = section.trim();
     const folderId = getDriveFolderId(selectedCourse);
 
     setUploading(true);
@@ -222,6 +224,9 @@ export default function TeacherUploadPage() {
         formData.append("uploadedBy", user.id);
         formData.append("uploadedByName", user.name);
         formData.append("subjectName", currentSubject?.subjectName ?? selectedCourse);
+        if (normalizedSection) {
+          formData.append("section", normalizedSection);
+        }
 
         const data = await uploadFileWithProgress(formData, (loadedBytes) => {
           const uploadedBytes = completedBytes + loadedBytes;
@@ -256,6 +261,7 @@ export default function TeacherUploadPage() {
           name: data.file.name,
           type: data.file.type,
           size: data.file.size,
+          section: data.file.section,
           courseCode: data.file.courseCode,
           subjectName: data.file.subjectName,
           uploadedBy: data.file.uploadedBy,
@@ -488,6 +494,21 @@ export default function TeacherUploadPage() {
         />
       ) : (
         <>
+          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <label className="mb-2 block text-sm font-semibold text-slate-700">
+              Section (optional, recommended)
+            </label>
+            <input
+              value={section}
+              onChange={(e) => setSection(e.target.value)}
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              placeholder="e.g. A, B, Morning Batch"
+            />
+            <p className="mt-2 text-xs text-slate-500">
+              Students will see this near files to avoid confusion across parallel sections.
+            </p>
+          </div>
+
           {/* Upload zone */}
           <div className="mb-6">
             <UploadZone onFilesSelected={handleUpload} uploading={uploading} />

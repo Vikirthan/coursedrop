@@ -36,6 +36,7 @@ export interface StudyFile {
   name: string;
   type: string; // e.g. "pdf", "pptx"
   size: number; // bytes
+  section?: string;
   courseCode: string;
   subjectName: string;
   uploadedBy: string; // teacher id
@@ -59,5 +60,20 @@ export interface Subject {
 export interface CourseShareAccess {
   courseCode: string;
   teacherIds: string[];
+  updatedAt: string;
+}
+
+export type BugReportStatus = "open" | "triaged" | "resolved";
+
+export interface BugReport {
+  id: string;
+  reporterName: string;
+  reporterEmail: string;
+  reporterRole: UserRole | "guest";
+  pagePath?: string;
+  message: string;
+  status: BugReportStatus;
+  adminNote?: string;
+  createdAt: string;
   updatedAt: string;
 }

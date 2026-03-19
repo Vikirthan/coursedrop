@@ -150,9 +150,17 @@ export default function StudentPortal() {
             </div>
             <span className="text-lg font-extrabold text-slate-800">CourseDrop</span>
           </Link>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
-            <FiBookOpen />
-            <span className="font-semibold">Student Portal</span>
+          <div className="flex items-center gap-3 text-sm text-slate-500">
+            <div className="flex items-center gap-2">
+              <FiBookOpen />
+              <span className="font-semibold">Student Portal</span>
+            </div>
+            <Link
+              href="/report-bug?source=/student"
+              className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+            >
+              Report Bug
+            </Link>
           </div>
         </div>
       </header>
@@ -220,6 +228,8 @@ export default function StudentPortal() {
                     file={f}
                     selectable
                     selected={selectedFiles.has(f.id)}
+                    showSection
+                    showUploader
                     onSelect={handleSelectToggle}
                     onDownload={handleSingleDownload}
                   />

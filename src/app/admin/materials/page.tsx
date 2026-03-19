@@ -8,6 +8,9 @@ import {
   getAllSubjects,
   getFilesByCourse,
   deleteFile,
+  deleteFilesByCourse,
+  getDriveFolderId,
+  clearDriveFolderIdForCourse,
   getOwnerTeacherIdsForCourse,
   getSharedTeacherIdsForCourse,
   setSharedTeacherIdsForCourse,
@@ -16,7 +19,8 @@ import { StudyFile, Subject } from "@/lib/types";
 import { SectionHeader, EmptyState } from "@/components/ui";
 import FileCard from "@/components/FileCard";
 import ConfirmModal from "@/components/ConfirmModal";
-import { FiFileText, FiFolder, FiUsers, FiSave, FiLoader } from "react-icons/fi";
+import PasswordModal from "@/components/PasswordModal";
+import { FiFileText, FiFolder, FiUsers, FiSave, FiLoader, FiTrash2 } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 interface TeacherOption {
@@ -38,6 +42,9 @@ export default function AdminMaterialsPage() {
   const [sharedTeacherIds, setSharedTeacherIds] = useState<string[]>([]);
   const [sharingDirty, setSharingDirty] = useState(false);
   const [savingSharing, setSavingSharing] = useState(false);
+  const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
+  const [deleteFolderLoading, setDeleteFolderLoading] = useState(false);
+  const [deleteFolderError, setDeleteFolderError] = useState("");
 
   const refresh = () => {
     const subs = getAllSubjects();
@@ -126,6 +133,66 @@ export default function AdminMaterialsPage() {
     }
   };
 
+  const handleDeleteFolderClick = () => {
+    if (!selectedCourse) {
+      toast.error("Select a subject first");
+      return;
+    }
+
+    const folderId = getDriveFolderId(selectedCourse);
+    if (!folderId) {
+      toast.error("No Drive folder found for this course");
+      return;
+    }
+
+    setDeleteFolderError("");
+    setShowDeleteFolderModal(true);
+  };
+
+  const handleDeleteFolderConfirm = async (password: string) => {
+    if (!selectedCourse) {
+      toast.error("Select a subject first");
+      return;
+    }
+
+    const folderId = getDriveFolderId(selectedCourse);
+    if (!folderId) {
+      throw new Error("No Drive folder found for this course");
+    }
+
+    setDeleteFolderLoading(true);
+    setDeleteFolderError("");
+
+    try {
+      const res = await fetch("/api/drive/delete-folder", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderId,
+          asAdmin: true,
+          adminPassword: password,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete folder");
+      }
+
+      deleteFilesByCourse(selectedCourse);
+      clearDriveFolderIdForCourse(selectedCourse);
+      setShowDeleteFolderModal(false);
+      toast.success("Folder and related course files deleted");
+      refresh();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to delete folder";
+      setDeleteFolderError(message);
+      throw err instanceof Error ? err : new Error(message);
+    } finally {
+      setDeleteFolderLoading(false);
+    }
+  };
+
   return (
     <div>
       <SectionHeader title="All Study Materials" />
@@ -179,6 +246,15 @@ export default function AdminMaterialsPage() {
             >
               {savingSharing ? <FiLoader className="animate-spin" /> : <FiSave />}
               Save Sharing
+            </button>
+          </div>
+
+          <div className="mb-4">
+            <button
+              onClick={handleDeleteFolderClick}
+              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+            >
+              <FiTrash2 /> Delete Whole Folder (Admin)
             </button>
           </div>
 
@@ -274,6 +350,19 @@ export default function AdminMaterialsPage() {
         danger
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <PasswordModal
+        isOpen={showDeleteFolderModal}
+        title="Admin Folder Deletion"
+        description="Enter admin password to delete the full Drive folder and clear course files from the portal."
+        onConfirm={handleDeleteFolderConfirm}
+        onCancel={() => {
+          setShowDeleteFolderModal(false);
+          setDeleteFolderError("");
+        }}
+        isLoading={deleteFolderLoading}
+        error={deleteFolderError}
       />
     </div>
   );

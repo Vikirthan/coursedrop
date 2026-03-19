@@ -8,12 +8,15 @@ import {
   RequestStatus,
   Subject,
   CourseShareAccess,
+  BugReport,
+  BugReportStatus,
 } from "./types";
 import { SEED_REQUESTS, SEED_FILES } from "./mockData";
 
 const REQUESTS_KEY = "coursedrop_requests";
 const FILES_KEY = "coursedrop_files";
 const COURSE_SHARING_KEY = "coursedrop_course_sharing";
+const BUG_REPORTS_KEY = "coursedrop_bug_reports";
 
 // ---- helpers ----
 function isBrowser() {
@@ -37,6 +40,10 @@ function saveJSON<T>(key: string, data: T) {
 
 function dedupe(values: string[]): string[] {
   return Array.from(new Set(values));
+}
+
+function createLocalId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 // ---- Subject Requests ----
@@ -202,6 +209,19 @@ export function setDriveFolderIdForCourse(
   saveJSON(REQUESTS_KEY, all);
 }
 
+export function clearDriveFolderIdForCourse(courseCode: string) {
+  const all = getRequests().map((r) => {
+    if (r.courseCode !== courseCode || r.status !== "approved") {
+      return r;
+    }
+
+    const { driveFolderId: _ignored, ...rest } = r;
+    return { ...rest, updatedAt: new Date().toISOString() };
+  });
+
+  saveJSON(REQUESTS_KEY, all);
+}
+
 // ---- Files ----
 
 export function getFiles(): StudyFile[] {
@@ -220,6 +240,11 @@ export function addFile(file: StudyFile) {
 
 export function deleteFile(fileId: string) {
   const all = getFiles().filter((f) => f.id !== fileId);
+  saveJSON(FILES_KEY, all);
+}
+
+export function deleteFilesByCourse(courseCode: string) {
+  const all = getFiles().filter((f) => f.courseCode !== courseCode);
   saveJSON(FILES_KEY, all);
 }
 
@@ -251,6 +276,58 @@ export function getAllSubjects(): Subject[] {
   }));
 }
 
+// ---- Bug Reports ----
+
+export function getBugReports(): BugReport[] {
+  const all = loadJSON<BugReport[]>(BUG_REPORTS_KEY, []);
+  return [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function addBugReport(payload: {
+  reporterName: string;
+  reporterEmail: string;
+  reporterRole: BugReport["reporterRole"];
+  pagePath?: string;
+  message: string;
+}): BugReport {
+  const now = new Date().toISOString();
+  const report: BugReport = {
+    id: createLocalId("bug"),
+    reporterName: payload.reporterName.trim() || "Anonymous",
+    reporterEmail: payload.reporterEmail.trim(),
+    reporterRole: payload.reporterRole,
+    pagePath: payload.pagePath?.trim() || undefined,
+    message: payload.message.trim(),
+    status: "open",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  const all = getBugReports();
+  all.push(report);
+  saveJSON(BUG_REPORTS_KEY, all);
+  return report;
+}
+
+export function updateBugReportStatus(
+  id: string,
+  status: BugReportStatus,
+  adminNote?: string
+) {
+  const all = getBugReports().map((report) =>
+    report.id === id
+      ? {
+          ...report,
+          status,
+          adminNote: adminNote?.trim() || report.adminNote,
+          updatedAt: new Date().toISOString(),
+        }
+      : report
+  );
+
+  saveJSON(BUG_REPORTS_KEY, all);
+}
+
 // ---- Reset (useful for dev) ----
 
 export function resetStore() {
@@ -258,4 +335,5 @@ export function resetStore() {
   localStorage.removeItem(REQUESTS_KEY);
   localStorage.removeItem(FILES_KEY);
   localStorage.removeItem(COURSE_SHARING_KEY);
+  localStorage.removeItem(BUG_REPORTS_KEY);
 }

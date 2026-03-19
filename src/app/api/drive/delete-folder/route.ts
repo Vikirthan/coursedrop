@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { compare } from "bcryptjs";
 import { google } from "googleapis";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
+import { ADMIN_PASSWORD } from "@/lib/mockData";
 
 interface DeleteFolderPayload {
   folderId: string;
-  teacherId: string;
-  password: string;
+  teacherId?: string;
+  password?: string;
+  asAdmin?: boolean;
+  adminPassword?: string;
 }
 
 function getErrorMessage(err: unknown): string {
@@ -37,9 +40,8 @@ function getErrorMessage(err: unknown): string {
 async function getDriveAuth() {
   const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const keyStr = process.env.GOOGLE_PRIVATE_KEY;
-  const sharedDriveId = process.env.GOOGLE_DRIVE_SHARED_DRIVE_ID;
 
-  if (!email || !keyStr || !sharedDriveId) {
+  if (!email || !keyStr) {
     throw new Error("Missing Google Drive configuration");
   }
 
@@ -50,7 +52,7 @@ async function getDriveAuth() {
     scopes: ["https://www.googleapis.com/auth/drive"],
   });
 
-  return { auth, sharedDriveId };
+  return { auth };
 }
 
 export async function DELETE(req: NextRequest) {
@@ -59,39 +61,65 @@ export async function DELETE(req: NextRequest) {
     const folderId = (body.folderId ?? "").trim();
     const teacherId = (body.teacherId ?? "").trim();
     const password = body.password ?? "";
+    const asAdmin = body.asAdmin === true;
+    const adminPassword = body.adminPassword ?? "";
 
-    if (!folderId || !teacherId || !password) {
+    if (!folderId) {
       return NextResponse.json(
-        { error: "folderId, teacherId, and password are required" },
+        { error: "folderId is required" },
         { status: 400 }
       );
     }
 
-    // Verify teacher password
-    const supabase = getSupabaseAdminClient();
-    const { data: teacher, error: teacherErr } = await supabase
-      .from("teacher_accounts")
-      .select("password_hash")
-      .eq("id", teacherId)
-      .maybeSingle();
+    if (asAdmin) {
+      const expected = (process.env.ADMIN_DELETE_PASSWORD ?? ADMIN_PASSWORD).trim();
+      if (!adminPassword.trim()) {
+        return NextResponse.json(
+          { error: "Admin password is required" },
+          { status: 400 }
+        );
+      }
 
-    if (teacherErr || !teacher) {
-      return NextResponse.json(
-        { error: "Teacher not found" },
-        { status: 404 }
-      );
-    }
+      if (adminPassword !== expected) {
+        return NextResponse.json(
+          { error: "Invalid admin password" },
+          { status: 401 }
+        );
+      }
+    } else {
+      if (!teacherId || !password) {
+        return NextResponse.json(
+          { error: "teacherId and password are required" },
+          { status: 400 }
+        );
+      }
 
-    const passwordOk = await compare(password, teacher.password_hash);
-    if (!passwordOk) {
-      return NextResponse.json(
-        { error: "Invalid password" },
-        { status: 401 }
-      );
+      // Verify teacher password
+      const supabase = getSupabaseAdminClient();
+      const { data: teacher, error: teacherErr } = await supabase
+        .from("teacher_accounts")
+        .select("password_hash")
+        .eq("id", teacherId)
+        .maybeSingle();
+
+      if (teacherErr || !teacher) {
+        return NextResponse.json(
+          { error: "Teacher not found" },
+          { status: 404 }
+        );
+      }
+
+      const passwordOk = await compare(password, teacher.password_hash);
+      if (!passwordOk) {
+        return NextResponse.json(
+          { error: "Invalid password" },
+          { status: 401 }
+        );
+      }
     }
 
     // Delete folder from Google Drive
-    const { auth, sharedDriveId } = await getDriveAuth();
+    const { auth } = await getDriveAuth();
     const drive = google.drive({ version: "v3", auth });
 
     // Recursively delete all files and subfolders

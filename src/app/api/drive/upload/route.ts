@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
     const uploadedBy = formData.get("uploadedBy") as string | null;
     const uploadedByName = formData.get("uploadedByName") as string | null;
     const subjectName = formData.get("subjectName") as string | null;
+    const section = formData.get("section") as string | null;
 
     if (!file || !courseCode) {
       return NextResponse.json(
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
       name: file.name,
       type: file.name.split(".").pop() ?? "",
       size: file.size,
+      section: section?.trim() || undefined,
       courseCode,
       subjectName: resolvedSubjectName,
       uploadedBy: uploadedBy ?? "unknown",

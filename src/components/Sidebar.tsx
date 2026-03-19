@@ -15,6 +15,7 @@ import {
   FiUsers,
   FiFileText,
   FiHome,
+  FiAlertCircle,
 } from "react-icons/fi";
 
 interface NavItem {
@@ -28,12 +29,14 @@ const adminNav: NavItem[] = [
   { label: "Requests", href: "/admin/requests", icon: <FiUsers /> },
   { label: "Teachers", href: "/admin/teachers", icon: <FiUsers /> },
   { label: "Materials", href: "/admin/materials", icon: <FiFileText /> },
+  { label: "Bug Reports", href: "/admin/bugs", icon: <FiAlertCircle /> },
 ];
 
 const teacherNav: NavItem[] = [
   { label: "Dashboard", href: "/teacher", icon: <FiGrid /> },
   { label: "Upload", href: "/teacher/upload", icon: <FiUploadCloud /> },
   { label: "My Requests", href: "/teacher/requests", icon: <FiSend /> },
+  { label: "Report Bug", href: "/report-bug", icon: <FiAlertCircle /> },
 ];
 
 export default function Sidebar() {

@@ -13,6 +13,8 @@ interface FileCardProps {
   file: StudyFile;
   selectable?: boolean;
   selected?: boolean;
+  showUploader?: boolean;
+  showSection?: boolean;
   onSelect?: (id: string) => void;
   onDelete?: (id: string) => void;
   onDownload?: (file: StudyFile) => void;
@@ -22,6 +24,8 @@ export default function FileCard({
   file,
   selectable,
   selected,
+  showUploader = false,
+  showSection = false,
   onSelect,
   onDelete,
   onDownload,
@@ -53,6 +57,16 @@ export default function FileCard({
           <p className="mt-0.5 text-xs text-slate-400">
             {formatBytes(file.size)} &middot; {formatDate(file.uploadDate)}
           </p>
+          {showSection && file.section && (
+            <p className="mt-1 text-xs font-semibold text-indigo-600">
+              Section: {file.section}
+            </p>
+          )}
+          {showUploader && (
+            <p className="mt-1 text-xs text-slate-500">
+              Uploaded by: {file.uploadedByName}
+            </p>
+          )}
         </div>
       </div>
 
