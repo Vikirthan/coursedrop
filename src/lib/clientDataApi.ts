@@ -116,8 +116,15 @@ export async function apiUpdateRequest(payload: {
   return null;
 }
 
-export async function apiListFiles(courseCode?: string): Promise<StudyFile[]> {
-  const qs = makeQuery({ courseCode });
+export async function apiListFiles(
+  courseCode?: string,
+  options?: { syncFromDrive?: boolean }
+): Promise<StudyFile[]> {
+  const shouldSync = !!courseCode && options?.syncFromDrive !== false;
+  const qs = makeQuery({
+    courseCode,
+    sync: shouldSync ? "1" : undefined,
+  });
   const res = await fetchNoStore(`/api/data/files${qs}`);
   const data = await parseJson<{ files: StudyFile[] }>(res);
   return data.files ?? [];

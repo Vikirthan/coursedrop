@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
+import { listFilesInFolder } from "@/lib/drive";
 import { StudyFile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,146 @@ type FileRow = {
   drive_download_url: string;
   drive_thumbnail_url: string | null;
 };
+
+type RequestRow = {
+  course_code: string;
+  subject_name: string;
+  teacher_id: string;
+  teacher_name: string;
+  drive_folder_id: string | null;
+};
+
+const FILE_SELECT_COLUMNS =
+  "id,name,type,size,section,course_code,subject_name,uploaded_by,uploaded_by_name,upload_date,drive_file_id,drive_download_url,drive_thumbnail_url";
+
+const DRIVE_SYNC_MIN_INTERVAL_MS = 60_000;
+const lastDriveSyncMsByCourse = new Map<string, number>();
+
+function shouldSyncFromQuery(raw: string): boolean {
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function deriveFileType(name: string, mimeType: string): string {
+  const dot = name.lastIndexOf(".");
+  if (dot >= 0 && dot < name.length - 1) {
+    return name.slice(dot + 1).toLowerCase();
+  }
+
+  const fromMime = mimeType.split("/").pop()?.trim().toLowerCase();
+  return fromMime || "file";
+}
+
+async function syncCourseFromDrive(courseCode: string): Promise<{ inserted: number; warnings: string[] }> {
+  const warnings: string[] = [];
+  const supabase = getSupabaseAdminClient();
+
+  const { data: requestRows, error: requestError } = await supabase
+    .from("subject_requests")
+    .select("course_code,subject_name,teacher_id,teacher_name,drive_folder_id")
+    .ilike("course_code", courseCode)
+    .eq("status", "approved");
+
+  if (requestError) {
+    throw requestError;
+  }
+
+  const approvedRows = (requestRows ?? []) as RequestRow[];
+  const rowByFolder = new Map<string, RequestRow>();
+  for (const row of approvedRows) {
+    const folderId = (row.drive_folder_id ?? "").trim();
+    if (!folderId || rowByFolder.has(folderId)) {
+      continue;
+    }
+    rowByFolder.set(folderId, row);
+  }
+
+  if (rowByFolder.size === 0) {
+    return { inserted: 0, warnings };
+  }
+
+  const { data: existingRows, error: existingError } = await supabase
+    .from("study_files")
+    .select("drive_file_id")
+    .ilike("course_code", courseCode);
+
+  if (existingError) {
+    throw existingError;
+  }
+
+  const existingDriveIds = new Set(
+    (existingRows ?? [])
+      .map((row) => {
+        const value = (row as { drive_file_id?: unknown }).drive_file_id;
+        return typeof value === "string" ? value.trim() : "";
+      })
+      .filter((value) => value.length > 0)
+  );
+
+  const rowsToInsert: Array<{
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    section: null;
+    course_code: string;
+    subject_name: string;
+    uploaded_by: string;
+    uploaded_by_name: string;
+    upload_date: string;
+    drive_file_id: string;
+    drive_download_url: string;
+    drive_thumbnail_url: null;
+  }> = [];
+
+  for (const [folderId, ownerRow] of rowByFolder.entries()) {
+    try {
+      const driveFiles = await listFilesInFolder(folderId);
+
+      for (const driveFile of driveFiles) {
+        const driveId = (driveFile.id ?? "").trim();
+        if (!driveId || existingDriveIds.has(driveId)) {
+          continue;
+        }
+
+        existingDriveIds.add(driveId);
+        rowsToInsert.push({
+          id: `file-${crypto.randomUUID()}`,
+          name: (driveFile.name ?? "").trim() || `drive-file-${driveId}`,
+          type: deriveFileType(driveFile.name ?? "", driveFile.mimeType ?? ""),
+          size: Number.parseInt(driveFile.size ?? "0", 10) || 0,
+          section: null,
+          course_code: courseCode,
+          subject_name: (ownerRow.subject_name ?? "").trim() || courseCode,
+          uploaded_by: (ownerRow.teacher_id ?? "").trim() || "unknown",
+          uploaded_by_name: (ownerRow.teacher_name ?? "").trim() || "Recovered",
+          upload_date: new Date().toISOString(),
+          drive_file_id: driveId,
+          drive_download_url: `https://drive.google.com/uc?export=download&id=${driveId}`,
+          drive_thumbnail_url: null,
+        });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown drive sync error";
+      warnings.push(`Folder ${folderId}: ${message}`);
+    }
+  }
+
+  if (rowsToInsert.length === 0) {
+    return { inserted: 0, warnings };
+  }
+
+  const { error: insertError } = await supabase
+    .from("study_files")
+    .insert(rowsToInsert)
+    .select("id");
+
+  if (insertError) {
+    throw insertError;
+  }
+
+  return { inserted: rowsToInsert.length, warnings };
+}
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error && err.message.trim()) {
@@ -78,11 +219,29 @@ function toStudyFile(row: FileRow): StudyFile {
 export async function GET(req: NextRequest) {
   try {
     const courseCode = (req.nextUrl.searchParams.get("courseCode") ?? "").trim().toUpperCase();
+    const sync = shouldSyncFromQuery(req.nextUrl.searchParams.get("sync") ?? "");
+    let syncResult: { inserted: number; warnings: string[] } | null = null;
+
+    if (courseCode && sync) {
+      const nowMs = Date.now();
+      const lastSyncMs = lastDriveSyncMsByCourse.get(courseCode) ?? 0;
+
+      if (nowMs - lastSyncMs >= DRIVE_SYNC_MIN_INTERVAL_MS) {
+        try {
+          syncResult = await syncCourseFromDrive(courseCode);
+          lastDriveSyncMsByCourse.set(courseCode, nowMs);
+        } catch (syncErr: unknown) {
+          const msg = getErrorMessage(syncErr);
+          console.warn(`[data/files][GET] Drive sync warning for ${courseCode}:`, msg);
+          syncResult = { inserted: 0, warnings: [msg] };
+        }
+      }
+    }
 
     const supabase = getSupabaseAdminClient();
     let query = supabase
       .from("study_files")
-      .select("id,name,type,size,section,course_code,subject_name,uploaded_by,uploaded_by_name,upload_date,drive_file_id,drive_download_url,drive_thumbnail_url")
+      .select(FILE_SELECT_COLUMNS)
       .order("upload_date", { ascending: false });
 
     if (courseCode) {
@@ -95,7 +254,15 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { files: (data ?? []).map((row) => toStudyFile(row as FileRow)) },
+      {
+        files: (data ?? []).map((row) => toStudyFile(row as FileRow)),
+        sync: syncResult
+          ? {
+              inserted: syncResult.inserted,
+              warnings: syncResult.warnings,
+            }
+          : undefined,
+      },
       { headers: NO_STORE_HEADERS }
     );
   } catch (err: unknown) {
