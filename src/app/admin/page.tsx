@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from "react";
 import { FiUsers, FiFileText, FiCheckCircle, FiClock } from "react-icons/fi";
 import { StatCard, SectionHeader } from "@/components/ui";
-import { getRequests, getFiles, getAllSubjects } from "@/lib/store";
+import { apiListFiles, apiListRequests } from "@/lib/clientDataApi";
 import { SubjectRequest, StudyFile } from "@/lib/types";
 
 export default function AdminDashboard() {
@@ -14,13 +14,24 @@ export default function AdminDashboard() {
   const [files, setFiles] = useState<StudyFile[]>([]);
 
   useEffect(() => {
-    setRequests(getRequests());
-    setFiles(getFiles());
+    const load = async () => {
+      try {
+        const [nextRequests, nextFiles] = await Promise.all([
+          apiListRequests(),
+          apiListFiles(),
+        ]);
+        setRequests(nextRequests);
+        setFiles(nextFiles);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    void load();
   }, []);
 
   const pending = requests.filter((r) => r.status === "pending").length;
   const approved = requests.filter((r) => r.status === "approved").length;
-  const subjects = getAllSubjects();
 
   return (
     <div>

@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
-import { addBugReport } from "@/lib/store";
+import { apiCreateBugReport } from "@/lib/clientDataApi";
 import { FiAlertCircle, FiArrowLeft, FiCheckCircle } from "react-icons/fi";
 
 export default function ReportBugPage() {
@@ -37,7 +37,7 @@ export default function ReportBugPage() {
     }
   }, [user]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -53,7 +53,7 @@ export default function ReportBugPage() {
 
     setLoading(true);
     try {
-      addBugReport({
+      await apiCreateBugReport({
         reporterName,
         reporterEmail,
         reporterRole: user?.role ?? "guest",

@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
-import { getAllSubjects, getFilesByCourse } from "@/lib/store";
+import { apiListFiles, apiListSubjects } from "@/lib/clientDataApi";
 import { Subject, StudyFile } from "@/lib/types";
 import { EmptyState } from "@/components/ui";
 import FileCard from "@/components/FileCard";
@@ -30,14 +30,36 @@ export default function StudentPortal() {
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    setSubjects(getAllSubjects());
+    const load = async () => {
+      try {
+        setSubjects(await apiListSubjects());
+      } catch (err) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to load subjects");
+      }
+    };
+
+    void load();
   }, []);
 
   useEffect(() => {
-    if (selectedCourse) {
-      setFiles(getFilesByCourse(selectedCourse));
+    if (!selectedCourse) {
+      setFiles([]);
       setSelectedFiles(new Set());
+      return;
     }
+
+    const load = async () => {
+      try {
+        setFiles(await apiListFiles(selectedCourse));
+        setSelectedFiles(new Set());
+      } catch (err) {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to load files");
+      }
+    };
+
+    void load();
   }, [selectedCourse]);
 
   const filtered = useMemo(() => {

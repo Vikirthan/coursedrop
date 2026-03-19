@@ -7,14 +7,14 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getAccessibleSubjects,
-  getOwnedApprovedCourseCodes,
-  getFilesByCourse,
-  addFile,
-  deleteFile,
-  getDriveFolderId,
-  setDriveFolderIdForCourse,
-} from "@/lib/store";
+  apiCreateFile,
+  apiDeleteFile,
+  apiDeleteFilesByCourse,
+  apiGetTeacherSharedCourses,
+  apiListFiles,
+  apiListRequests,
+  apiUpdateRequest,
+} from "@/lib/clientDataApi";
 import { StudyFile, SubjectRequest } from "@/lib/types";
 import { SectionHeader, EmptyState } from "@/components/ui";
 import UploadZone from "@/components/UploadZone";
@@ -65,6 +65,7 @@ function formatEta(seconds: number | null): string {
 
 export default function TeacherUploadPage() {
   const { user } = useAuth();
+  const [allApprovedRequests, setAllApprovedRequests] = useState<SubjectRequest[]>([]);
   const [subjects, setSubjects] = useState<SubjectRequest[]>([]);
   const [ownedCourseCodes, setOwnedCourseCodes] = useState<string[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
@@ -82,25 +83,68 @@ export default function TeacherUploadPage() {
   const activeUploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const cancelUploadRef = useRef(false);
 
-  const refresh = () => {
+  const refresh = async () => {
     if (!user) return;
-    const owned = getOwnedApprovedCourseCodes(user.id);
-    setOwnedCourseCodes(owned);
 
-    const s = getAccessibleSubjects(user.id);
-    setSubjects(s);
-    if (selectedCourse) {
-      const stillAccessible = s.some((subject) => subject.courseCode === selectedCourse);
-      if (!stillAccessible) {
-        setSelectedCourse(null);
-        setFiles([]);
-      } else {
-        setFiles(getFilesByCourse(selectedCourse));
+    try {
+      const [approvedRequests, sharedCourseCodes] = await Promise.all([
+        apiListRequests({ status: "approved" }),
+        apiGetTeacherSharedCourses(user.id),
+      ]);
+
+      setAllApprovedRequests(approvedRequests);
+
+      const ownedCourseSet = new Set<string>();
+      const accessibleByCourse = new Map<string, SubjectRequest>();
+
+      for (const request of approvedRequests) {
+        if (request.teacherId === user.id) {
+          ownedCourseSet.add(request.courseCode);
+          if (!accessibleByCourse.has(request.courseCode)) {
+            accessibleByCourse.set(request.courseCode, request);
+          }
+        }
       }
+
+      for (const courseCode of sharedCourseCodes) {
+        if (accessibleByCourse.has(courseCode)) {
+          continue;
+        }
+        const match = approvedRequests.find((request) => request.courseCode === courseCode);
+        if (match) {
+          accessibleByCourse.set(courseCode, match);
+        }
+      }
+
+      const accessibleSubjects = Array.from(accessibleByCourse.values());
+      setOwnedCourseCodes(Array.from(ownedCourseSet));
+      setSubjects(accessibleSubjects);
+
+      if (selectedCourse) {
+        const stillAccessible = accessibleSubjects.some(
+          (subject) => subject.courseCode === selectedCourse
+        );
+        if (!stillAccessible) {
+          setSelectedCourse(null);
+          setFiles([]);
+        } else {
+          setFiles(await apiListFiles(selectedCourse));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to load upload data");
     }
   };
 
-  useEffect(refresh, [user, selectedCourse]);
+  useEffect(() => {
+    void refresh();
+  }, [user, selectedCourse]);
+
+  const getFolderIdForCourse = (courseCode: string): string | undefined =>
+    allApprovedRequests.find(
+      (request) => request.courseCode === courseCode && !!request.driveFolderId
+    )?.driveFolderId;
 
   const uploadFileWithProgress = (
     formData: FormData,
@@ -175,7 +219,7 @@ export default function TeacherUploadPage() {
     if (!selectedCourse || !user) return;
 
     const normalizedSection = section.trim();
-    const folderId = getDriveFolderId(selectedCourse);
+    const folderId = getFolderIdForCourse(selectedCourse);
 
     setUploading(true);
     cancelUploadRef.current = false;
@@ -252,7 +296,10 @@ export default function TeacherUploadPage() {
 
         if (data.folderIdUsed && data.folderIdUsed !== effectiveFolderId) {
           effectiveFolderId = data.folderIdUsed;
-          setDriveFolderIdForCourse(selectedCourse, data.folderIdUsed);
+          await apiUpdateRequest({
+            courseCode: selectedCourse,
+            driveFolderId: data.folderIdUsed,
+          });
         }
 
         // Store file metadata locally
@@ -270,7 +317,7 @@ export default function TeacherUploadPage() {
           driveFileId: data.file.driveFileId,
           driveDownloadUrl: data.file.driveDownloadUrl,
         };
-        addFile(newFile);
+        await apiCreateFile(newFile);
         uploaded++;
 
         setUploadProgress({
@@ -351,10 +398,10 @@ export default function TeacherUploadPage() {
       }
 
       // Delete from local store
-      deleteFile(deleteTarget);
+      await apiDeleteFile(deleteTarget);
       toast.success("File deleted from Drive");
       setDeleteTarget(null);
-      refresh();
+      await refresh();
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Delete failed");
@@ -387,7 +434,7 @@ export default function TeacherUploadPage() {
       return;
     }
 
-    const folderId = getDriveFolderId(selectedCourse);
+    const folderId = getFolderIdForCourse(selectedCourse);
     if (!folderId) {
       toast.error("No folder to delete");
       setShowPasswordModal(false);
@@ -413,10 +460,15 @@ export default function TeacherUploadPage() {
         throw new Error(data.error || "Failed to delete folder");
       }
 
+      await Promise.all([
+        apiDeleteFilesByCourse(selectedCourse),
+        apiUpdateRequest({ courseCode: selectedCourse, driveFolderId: null }),
+      ]);
+
       toast.success("Folder and all contents deleted successfully");
       setShowPasswordModal(false);
       setSelectedCourse(null);
-      refresh();
+      await refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : "An error occurred";
       setDeleteFolderError(message);

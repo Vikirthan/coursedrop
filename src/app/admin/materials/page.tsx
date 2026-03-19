@@ -5,17 +5,16 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  getAllSubjects,
-  getFilesByCourse,
-  deleteFile,
-  deleteFilesByCourse,
-  getDriveFolderId,
-  clearDriveFolderIdForCourse,
-  getOwnerTeacherIdsForCourse,
-  getSharedTeacherIdsForCourse,
-  setSharedTeacherIdsForCourse,
-} from "@/lib/store";
-import { StudyFile, Subject } from "@/lib/types";
+  apiDeleteFile,
+  apiDeleteFilesByCourse,
+  apiGetCourseSharing,
+  apiListFiles,
+  apiListRequests,
+  apiListSubjects,
+  apiSetCourseSharing,
+  apiUpdateRequest,
+} from "@/lib/clientDataApi";
+import { StudyFile, Subject, SubjectRequest } from "@/lib/types";
 import { SectionHeader, EmptyState } from "@/components/ui";
 import FileCard from "@/components/FileCard";
 import ConfirmModal from "@/components/ConfirmModal";
@@ -34,6 +33,7 @@ interface TeacherOption {
 
 export default function AdminMaterialsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [approvedRequests, setApprovedRequests] = useState<SubjectRequest[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [files, setFiles] = useState<StudyFile[]>([]);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -46,13 +46,26 @@ export default function AdminMaterialsPage() {
   const [deleteFolderLoading, setDeleteFolderLoading] = useState(false);
   const [deleteFolderError, setDeleteFolderError] = useState("");
 
-  const refresh = () => {
-    const subs = getAllSubjects();
-    setSubjects(subs);
-    if (selectedCourse) setFiles(getFilesByCourse(selectedCourse));
+  const refresh = async () => {
+    try {
+      const [nextSubjects, nextApprovedRequests, nextFiles] = await Promise.all([
+        apiListSubjects(),
+        apiListRequests({ status: "approved" }),
+        apiListFiles(selectedCourse ?? undefined),
+      ]);
+
+      setSubjects(nextSubjects);
+      setApprovedRequests(nextApprovedRequests);
+      setFiles(nextFiles);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to load materials");
+    }
   };
 
-  useEffect(refresh, [selectedCourse]);
+  useEffect(() => {
+    void refresh();
+  }, [selectedCourse]);
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -83,20 +96,39 @@ export default function AdminMaterialsPage() {
       return;
     }
 
-    setSharedTeacherIds(getSharedTeacherIdsForCourse(selectedCourse));
-    setSharingDirty(false);
+    apiGetCourseSharing(selectedCourse)
+      .then((ids) => {
+        setSharedTeacherIds(ids);
+        setSharingDirty(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to load sharing settings");
+      });
   }, [selectedCourse]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!deleteTarget) return;
-    deleteFile(deleteTarget);
-    toast.success("File deleted");
-    setDeleteTarget(null);
-    refresh();
+
+    try {
+      await apiDeleteFile(deleteTarget);
+      toast.success("File deleted");
+      setDeleteTarget(null);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to delete file");
+    }
   };
 
   const ownerTeacherIds = selectedCourse
-    ? getOwnerTeacherIdsForCourse(selectedCourse)
+    ? Array.from(
+        new Set(
+          approvedRequests
+            .filter((request) => request.courseCode === selectedCourse)
+            .map((request) => request.teacherId)
+        )
+      )
     : [];
 
   const approvedTeachers = teachers.filter((teacher) => teacher.approved);
@@ -121,16 +153,17 @@ export default function AdminMaterialsPage() {
     if (!selectedCourse) return;
 
     setSavingSharing(true);
-    try {
-      setSharedTeacherIdsForCourse(selectedCourse, sharedTeacherIds);
-      setSharingDirty(false);
-      toast.success("Teacher sharing updated");
-    } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to update sharing");
-    } finally {
-      setSavingSharing(false);
-    }
+    apiSetCourseSharing(selectedCourse, sharedTeacherIds)
+      .then((ids) => {
+        setSharedTeacherIds(ids);
+        setSharingDirty(false);
+        toast.success("Teacher sharing updated");
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to update sharing");
+      })
+      .finally(() => setSavingSharing(false));
   };
 
   const handleDeleteFolderClick = () => {
@@ -139,7 +172,10 @@ export default function AdminMaterialsPage() {
       return;
     }
 
-    const folderId = getDriveFolderId(selectedCourse);
+    const folderId = approvedRequests.find(
+      (request) => request.courseCode === selectedCourse && !!request.driveFolderId
+    )?.driveFolderId;
+
     if (!folderId) {
       toast.error("No Drive folder found for this course");
       return;
@@ -155,7 +191,10 @@ export default function AdminMaterialsPage() {
       return;
     }
 
-    const folderId = getDriveFolderId(selectedCourse);
+    const folderId = approvedRequests.find(
+      (request) => request.courseCode === selectedCourse && !!request.driveFolderId
+    )?.driveFolderId;
+
     if (!folderId) {
       throw new Error("No Drive folder found for this course");
     }
@@ -179,11 +218,14 @@ export default function AdminMaterialsPage() {
         throw new Error(data.error || "Failed to delete folder");
       }
 
-      deleteFilesByCourse(selectedCourse);
-      clearDriveFolderIdForCourse(selectedCourse);
+      await Promise.all([
+        apiDeleteFilesByCourse(selectedCourse),
+        apiUpdateRequest({ courseCode: selectedCourse, driveFolderId: null }),
+      ]);
+
       setShowDeleteFolderModal(false);
       toast.success("Folder and related course files deleted");
-      refresh();
+      await refresh();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to delete folder";
       setDeleteFolderError(message);
@@ -311,14 +353,7 @@ export default function AdminMaterialsPage() {
       )}
 
       {/* Files grid */}
-      {(selectedCourse ? files : (() => {
-        // show all files when no subject selected
-        const all: StudyFile[] = [];
-        for (const s of subjects) {
-          all.push(...getFilesByCourse(s.courseCode));
-        }
-        return all;
-      })()).length === 0 ? (
+      {files.length === 0 ? (
         <EmptyState
           icon={<FiFileText />}
           title="No files uploaded yet"
@@ -326,10 +361,7 @@ export default function AdminMaterialsPage() {
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {(selectedCourse
-            ? files
-            : subjects.flatMap((s) => getFilesByCourse(s.courseCode))
-          ).map((f) => (
+          {files.map((f) => (
             <FileCard
               key={f.id}
               file={f}

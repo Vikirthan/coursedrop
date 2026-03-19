@@ -4,7 +4,7 @@
 // ============================================================
 
 import React, { useEffect, useState } from "react";
-import { getRequests, getDriveFolderId, updateRequestStatus } from "@/lib/store";
+import { apiListRequests, apiUpdateRequest } from "@/lib/clientDataApi";
 import { SubjectRequest } from "@/lib/types";
 import { SectionHeader, StatusChip, EmptyState } from "@/components/ui";
 import { formatDate } from "@/lib/utils";
@@ -16,8 +16,19 @@ export default function AdminRequestsPage() {
   const [filter, setFilter] = useState<"all" | "pending" | "approved" | "rejected">("all");
   const [processingId, setProcessingId] = useState<string | null>(null);
 
-  const refresh = () => setRequests(getRequests());
-  useEffect(refresh, []);
+  const refresh = async () => {
+    try {
+      const next = await apiListRequests();
+      setRequests(next);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to load requests");
+    }
+  };
+
+  useEffect(() => {
+    void refresh();
+  }, []);
 
   const filtered =
     filter === "all" ? requests : requests.filter((r) => r.status === filter);
@@ -29,7 +40,12 @@ export default function AdminRequestsPage() {
       let folderId: string | undefined;
 
       if (action === "approved") {
-        folderId = getDriveFolderId(req.courseCode);
+        folderId = requests.find(
+          (item) =>
+            item.courseCode === req.courseCode &&
+            item.status === "approved" &&
+            !!item.driveFolderId
+        )?.driveFolderId;
 
         if (!folderId) {
           // Create a Google Drive folder only once per approved course.
@@ -50,13 +66,17 @@ export default function AdminRequestsPage() {
         }
       }
 
-      updateRequestStatus(req.id, action, folderId);
+      await apiUpdateRequest({
+        id: req.id,
+        status: action,
+        driveFolderId: folderId ?? undefined,
+      });
       toast.success(
         action === "approved"
           ? `Approved! Drive folder created.`
           : `Request rejected.`
       );
-      refresh();
+      await refresh();
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Action failed");

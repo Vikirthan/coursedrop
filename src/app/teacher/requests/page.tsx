@@ -5,10 +5,10 @@
 
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { getRequestsByTeacher, addRequest } from "@/lib/store";
+import { apiCreateRequest, apiListRequests } from "@/lib/clientDataApi";
 import { SubjectRequest } from "@/lib/types";
 import { SectionHeader, StatusChip, EmptyState } from "@/components/ui";
-import { uid, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { FiSend, FiInbox, FiPlus } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -23,37 +23,47 @@ export default function TeacherRequestsPage() {
   const [department, setDepartment] = useState("");
   const [message, setMessage] = useState("");
 
-  const refresh = () => {
-    if (user) setRequests(getRequestsByTeacher(user.id));
+  const refresh = async () => {
+    if (!user) return;
+    try {
+      const next = await apiListRequests({ teacherId: user.id });
+      setRequests(next);
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to load requests");
+    }
   };
-  useEffect(refresh, [user]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    void refresh();
+  }, [user]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
 
-    const req: SubjectRequest = {
-      id: uid(),
-      teacherId: user.id,
-      teacherName: user.name,
-      teacherEmail: user.email,
-      subjectName,
-      courseCode: courseCode.toUpperCase(),
-      department,
-      message,
-      status: "pending",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    try {
+      await apiCreateRequest({
+        teacherId: user.id,
+        teacherName: user.name,
+        teacherEmail: user.email,
+        subjectName,
+        courseCode: courseCode.toUpperCase(),
+        department,
+        message,
+      });
 
-    addRequest(req);
-    toast.success("Request submitted!");
-    setShowForm(false);
-    setSubjectName("");
-    setCourseCode("");
-    setDepartment("");
-    setMessage("");
-    refresh();
+      toast.success("Request submitted!");
+      setShowForm(false);
+      setSubjectName("");
+      setCourseCode("");
+      setDepartment("");
+      setMessage("");
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to submit request");
+    }
   };
 
   return (

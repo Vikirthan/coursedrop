@@ -83,3 +83,69 @@ GOOGLE_DRIVE_MASTER_FOLDER_ID=
 GOOGLE_DRIVE_SHARED_DRIVE_ID=
 GOOGLE_DRIVE_DELEGATED_USER_EMAIL=
 ```
+
+## Supabase Tables Required For Cross-Device Sync
+
+Run this once in Supabase SQL Editor so requests, files, sharing, and bug reports are shared across devices.
+
+```sql
+create table if not exists public.subject_requests (
+	id text primary key,
+	teacher_id text not null,
+	teacher_name text not null,
+	teacher_email text not null,
+	department text not null,
+	subject_name text not null,
+	course_code text not null,
+	message text,
+	status text not null check (status in ('pending', 'approved', 'rejected')) default 'pending',
+	created_at timestamptz not null default now(),
+	updated_at timestamptz not null default now(),
+	drive_folder_id text
+);
+
+create index if not exists idx_subject_requests_teacher_id on public.subject_requests (teacher_id);
+create index if not exists idx_subject_requests_course_code on public.subject_requests (course_code);
+create index if not exists idx_subject_requests_status on public.subject_requests (status);
+
+create table if not exists public.study_files (
+	id text primary key,
+	name text not null,
+	type text not null,
+	size bigint not null default 0,
+	section text,
+	course_code text not null,
+	subject_name text not null,
+	uploaded_by text not null,
+	uploaded_by_name text not null,
+	upload_date timestamptz not null default now(),
+	drive_file_id text not null,
+	drive_download_url text not null,
+	drive_thumbnail_url text
+);
+
+create index if not exists idx_study_files_course_code on public.study_files (course_code);
+create index if not exists idx_study_files_upload_date on public.study_files (upload_date desc);
+
+create table if not exists public.course_sharing (
+	course_code text primary key,
+	teacher_ids text[] not null default '{}',
+	updated_at timestamptz not null default now()
+);
+
+create table if not exists public.bug_reports (
+	id text primary key,
+	reporter_name text not null,
+	reporter_email text not null default '',
+	reporter_role text not null,
+	page_path text,
+	message text not null,
+	status text not null check (status in ('open', 'triaged', 'resolved')) default 'open',
+	admin_note text,
+	created_at timestamptz not null default now(),
+	updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_bug_reports_status on public.bug_reports (status);
+create index if not exists idx_bug_reports_created_at on public.bug_reports (created_at desc);
+```

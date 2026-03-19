@@ -6,11 +6,11 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  getAccessibleSubjects,
-  getRequestsByTeacher,
-  getFilesByCourse,
-} from "@/lib/store";
-import { SubjectRequest, StudyFile } from "@/lib/types";
+  apiGetTeacherSharedCourses,
+  apiListFiles,
+  apiListRequests,
+} from "@/lib/clientDataApi";
+import { SubjectRequest } from "@/lib/types";
 import { StatCard, SectionHeader, StatusChip } from "@/components/ui";
 import { FiSend, FiCheckCircle, FiFileText, FiClock } from "react-icons/fi";
 import { formatDate } from "@/lib/utils";
@@ -22,17 +22,50 @@ export default function TeacherDashboard() {
   const [accessibleSubjectCount, setAccessibleSubjectCount] = useState(0);
 
   useEffect(() => {
-    if (!user) return;
-    const reqs = getRequestsByTeacher(user.id);
-    setRequests(reqs);
+    if (!user) {
+      setRequests([]);
+      setFileCount(0);
+      setAccessibleSubjectCount(0);
+      return;
+    }
 
-    const accessible = getAccessibleSubjects(user.id);
-    setAccessibleSubjectCount(accessible.length);
+    const load = async () => {
+      try {
+        const [ownRequests, approvedRequests, sharedCourseCodes, files] =
+          await Promise.all([
+            apiListRequests({ teacherId: user.id }),
+            apiListRequests({ status: "approved" }),
+            apiGetTeacherSharedCourses(user.id),
+            apiListFiles(),
+          ]);
 
-    const courseCodes = Array.from(new Set(accessible.map((s) => s.courseCode)));
-    let count = 0;
-    for (const c of courseCodes) count += getFilesByCourse(c).length;
-    setFileCount(count);
+        setRequests(ownRequests);
+
+        const ownApprovedCourses = new Set(
+          approvedRequests
+            .filter((request) => request.teacherId === user.id)
+            .map((request) => request.courseCode)
+        );
+
+        for (const code of sharedCourseCodes) {
+          ownApprovedCourses.add(code);
+        }
+
+        const accessibleCourses = Array.from(ownApprovedCourses);
+        setAccessibleSubjectCount(accessibleCourses.length);
+
+        const accessibleCourseSet = new Set(accessibleCourses);
+        const totalFiles = files.reduce((count, file) =>
+          accessibleCourseSet.has(file.courseCode) ? count + 1 : count,
+        0);
+
+        setFileCount(totalFiles);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    void load();
   }, [user]);
 
   const pending = requests.filter((r) => r.status === "pending").length;

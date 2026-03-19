@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { getBugReports, updateBugReportStatus } from "@/lib/store";
+import { apiListBugReports, apiUpdateBugReport } from "@/lib/clientDataApi";
 import { BugReport, BugReportStatus } from "@/lib/types";
 import { SectionHeader, EmptyState } from "@/components/ui";
 import {
@@ -37,34 +37,33 @@ export default function AdminBugsPage() {
 
   const refresh = () => {
     setRefreshing(true);
-    try {
-      setReports(getBugReports());
-    } finally {
-      setRefreshing(false);
-    }
+    apiListBugReports(filter === "all" ? undefined : filter)
+      .then((next) => setReports(next))
+      .catch((err) => {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to load bug reports");
+      })
+      .finally(() => setRefreshing(false));
   };
 
   useEffect(() => {
     refresh();
-  }, []);
+  }, [filter]);
 
-  const filtered = useMemo(() => {
-    if (filter === "all") return reports;
-    return reports.filter((report) => report.status === filter);
-  }, [reports, filter]);
+  const filtered = useMemo(() => reports, [reports]);
 
   const handleStatusChange = (reportId: string, status: BugReportStatus) => {
     setUpdatingId(reportId);
-    try {
-      updateBugReportStatus(reportId, status);
-      refresh();
-      toast.success(`Marked as ${status}`);
-    } catch (err) {
-      console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to update report");
-    } finally {
-      setUpdatingId(null);
-    }
+    apiUpdateBugReport(reportId, status)
+      .then(() => {
+        refresh();
+        toast.success(`Marked as ${status}`);
+      })
+      .catch((err) => {
+        console.error(err);
+        toast.error(err instanceof Error ? err.message : "Failed to update report");
+      })
+      .finally(() => setUpdatingId(null));
   };
 
   return (
