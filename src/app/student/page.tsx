@@ -30,16 +30,45 @@ export default function StudentPortal() {
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
-    const load = async () => {
+    let cancelled = false;
+
+    const load = async (showError = true) => {
       try {
-        setSubjects(await apiListSubjects());
+        const nextSubjects = await apiListSubjects();
+        if (!cancelled) {
+          setSubjects(nextSubjects);
+        }
       } catch (err) {
         console.error(err);
-        toast.error(err instanceof Error ? err.message : "Failed to load subjects");
+        if (showError) {
+          toast.error(err instanceof Error ? err.message : "Failed to load subjects");
+        }
       }
     };
 
-    void load();
+    const tick = () => {
+      void load(false);
+    };
+
+    void load(true);
+
+    const intervalId = window.setInterval(tick, 8000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+      }
+    };
+
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, []);
 
   useEffect(() => {
@@ -49,17 +78,55 @@ export default function StudentPortal() {
       return;
     }
 
-    const load = async () => {
+    let cancelled = false;
+
+    const load = async (showError = true, resetSelection = false) => {
       try {
-        setFiles(await apiListFiles(selectedCourse));
-        setSelectedFiles(new Set());
+        const nextFiles = await apiListFiles(selectedCourse);
+        if (cancelled) {
+          return;
+        }
+
+        setFiles(nextFiles);
+        setSelectedFiles((prev) => {
+          if (resetSelection) {
+            return new Set();
+          }
+
+          const nextIds = new Set(nextFiles.map((file) => file.id));
+          return new Set(Array.from(prev).filter((id) => nextIds.has(id)));
+        });
       } catch (err) {
         console.error(err);
-        toast.error(err instanceof Error ? err.message : "Failed to load files");
+        if (showError) {
+          toast.error(err instanceof Error ? err.message : "Failed to load files");
+        }
       }
     };
 
-    void load();
+    const tick = () => {
+      void load(false, false);
+    };
+
+    void load(true, true);
+
+    const intervalId = window.setInterval(tick, 8000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+      }
+    };
+
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [selectedCourse]);
 
   const filtered = useMemo(() => {

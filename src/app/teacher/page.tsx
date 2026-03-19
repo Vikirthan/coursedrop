@@ -78,7 +78,28 @@ export default function TeacherDashboard() {
       }
     };
 
-    void load();
+    const tick = () => {
+      void load();
+    };
+
+    tick();
+
+    const intervalId = window.setInterval(tick, 8000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+      }
+    };
+
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [user]);
 
   const pending = requests.filter((r) => r.status === "pending").length;

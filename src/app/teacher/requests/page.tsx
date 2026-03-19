@@ -23,7 +23,7 @@ export default function TeacherRequestsPage() {
   const [department, setDepartment] = useState("");
   const [message, setMessage] = useState("");
 
-  const refresh = async () => {
+  const refresh = async (showError = true) => {
     if (!user) return;
     try {
       const teacherKeys = Array.from(
@@ -39,12 +39,41 @@ export default function TeacherRequestsPage() {
       setRequests(next);
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to load requests");
+      if (showError) {
+        toast.error(err instanceof Error ? err.message : "Failed to load requests");
+      }
     }
   };
 
   useEffect(() => {
-    void refresh();
+    void refresh(true);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const tick = () => {
+      void refresh(false);
+    };
+
+    const intervalId = window.setInterval(tick, 8000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+      }
+    };
+
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {

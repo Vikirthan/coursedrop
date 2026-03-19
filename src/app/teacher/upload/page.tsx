@@ -7,7 +7,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
-  apiCreateFile,
   apiDeleteFile,
   apiDeleteFilesByCourse,
   apiGetTeacherSharedCourses,
@@ -22,7 +21,6 @@ import FileCard from "@/components/FileCard";
 import PasswordModal from "@/components/PasswordModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import { FiFolder, FiLock, FiLoader, FiTrash2 } from "react-icons/fi";
-import { uid } from "@/lib/utils";
 import toast from "react-hot-toast";
 
 interface UploadProgressState {
@@ -35,7 +33,7 @@ interface UploadProgressState {
 }
 
 type UploadApiResponse = {
-  file: Omit<StudyFile, "id">;
+  file: StudyFile;
   folderIdUsed?: string;
 };
 
@@ -83,7 +81,7 @@ export default function TeacherUploadPage() {
   const activeUploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const cancelUploadRef = useRef(false);
 
-  const refresh = async () => {
+  const refresh = async (showError = true) => {
     if (!user) return;
 
     const teacherKeys = Array.from(
@@ -145,12 +143,41 @@ export default function TeacherUploadPage() {
       }
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to load upload data");
+      if (showError) {
+        toast.error(err instanceof Error ? err.message : "Failed to load upload data");
+      }
     }
   };
 
   useEffect(() => {
-    void refresh();
+    void refresh(true);
+  }, [user, selectedCourse]);
+
+  useEffect(() => {
+    if (!user) {
+      return;
+    }
+
+    const tick = () => {
+      void refresh(false);
+    };
+
+    const intervalId = window.setInterval(tick, 8000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        tick();
+      }
+    };
+
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [user, selectedCourse]);
 
   const getFolderIdForCourse = (courseCode: string): string | undefined =>
@@ -314,22 +341,7 @@ export default function TeacherUploadPage() {
           });
         }
 
-        // Store file metadata locally
-        const newFile: StudyFile = {
-          id: uid(),
-          name: data.file.name,
-          type: data.file.type,
-          size: data.file.size,
-          section: data.file.section,
-          courseCode: data.file.courseCode,
-          subjectName: data.file.subjectName,
-          uploadedBy: data.file.uploadedBy,
-          uploadedByName: data.file.uploadedByName,
-          uploadDate: data.file.uploadDate,
-          driveFileId: data.file.driveFileId,
-          driveDownloadUrl: data.file.driveDownloadUrl,
-        };
-        await apiCreateFile(newFile);
+        // Metadata is now persisted atomically by /api/drive/upload.
         uploaded++;
 
         setUploadProgress({

@@ -28,6 +28,30 @@ function normalizeTeacherKeys(keys: Array<string | undefined>): string[] {
   );
 }
 
+function withCacheBuster(url: string): string {
+  const separator = url.includes("?") ? "&" : "?";
+  return `${url}${separator}_ts=${Date.now()}`;
+}
+
+function mergeNoStoreHeaders(existing?: HeadersInit): Headers {
+  const headers = new Headers(existing);
+  if (!headers.has("Cache-Control")) {
+    headers.set("Cache-Control", "no-cache");
+  }
+  if (!headers.has("Pragma")) {
+    headers.set("Pragma", "no-cache");
+  }
+  return headers;
+}
+
+async function fetchNoStore(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(withCacheBuster(url), {
+    ...init,
+    cache: "no-store",
+    headers: mergeNoStoreHeaders(init.headers),
+  });
+}
+
 export async function apiListRequests(params?: {
   teacherId?: string;
   teacherIds?: string[];
@@ -51,7 +75,7 @@ export async function apiListRequests(params?: {
     status: params?.status,
     courseCode: params?.courseCode,
   });
-  const res = await fetch(`/api/data/requests${qs}`, { cache: "no-store" });
+  const res = await fetchNoStore(`/api/data/requests${qs}`);
   const data = await parseJson<{ requests: SubjectRequest[] }>(res);
   return data.requests ?? [];
 }
@@ -94,7 +118,7 @@ export async function apiUpdateRequest(payload: {
 
 export async function apiListFiles(courseCode?: string): Promise<StudyFile[]> {
   const qs = makeQuery({ courseCode });
-  const res = await fetch(`/api/data/files${qs}`, { cache: "no-store" });
+  const res = await fetchNoStore(`/api/data/files${qs}`);
   const data = await parseJson<{ files: StudyFile[] }>(res);
   return data.files ?? [];
 }
@@ -124,14 +148,14 @@ export async function apiDeleteFilesByCourse(courseCode: string): Promise<number
 }
 
 export async function apiListSubjects(): Promise<Subject[]> {
-  const res = await fetch("/api/data/subjects", { cache: "no-store" });
+  const res = await fetchNoStore("/api/data/subjects");
   const data = await parseJson<{ subjects: Subject[] }>(res);
   return data.subjects ?? [];
 }
 
 export async function apiGetCourseSharing(courseCode: string): Promise<string[]> {
   const qs = makeQuery({ courseCode });
-  const res = await fetch(`/api/data/sharing${qs}`, { cache: "no-store" });
+  const res = await fetchNoStore(`/api/data/sharing${qs}`);
   const data = await parseJson<{ teacherIds: string[] }>(res);
   return data.teacherIds ?? [];
 }
@@ -149,7 +173,7 @@ export async function apiGetTeacherSharedCourses(
   const qs = makeQuery({
     teacherId: teacherIds.length > 0 ? teacherIds.join(",") : undefined,
   });
-  const res = await fetch(`/api/data/sharing${qs}`, { cache: "no-store" });
+  const res = await fetchNoStore(`/api/data/sharing${qs}`);
   const data = await parseJson<{ courseCodes: string[] }>(res);
   return data.courseCodes ?? [];
 }
@@ -169,7 +193,7 @@ export async function apiSetCourseSharing(
 
 export async function apiListBugReports(status?: BugReportStatus): Promise<BugReport[]> {
   const qs = makeQuery({ status });
-  const res = await fetch(`/api/data/bugs${qs}`, { cache: "no-store" });
+  const res = await fetchNoStore(`/api/data/bugs${qs}`);
   const data = await parseJson<{ reports: BugReport[] }>(res);
   return data.reports ?? [];
 }
