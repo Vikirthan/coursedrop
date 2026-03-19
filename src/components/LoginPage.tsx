@@ -1,6 +1,6 @@
 "use client";
 // ============================================================
-// CourseDrop — Shared Login Page Component
+// CourseDrop — Enhanced Login Page Component
 // ============================================================
 
 import React, { useEffect, useState } from "react";
@@ -8,8 +8,9 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { ADMIN_ID, ADMIN_PASSWORD } from "@/lib/mockData";
 import { isGithubPagesRuntime } from "@/lib/runtime";
+import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
-import { FiLogIn, FiLoader } from "react-icons/fi";
+import { FiLogIn, FiLoader, FiAlertCircle, FiCheckCircle } from "react-icons/fi";
 
 interface LoginPageProps {
   role: "admin" | "teacher";
@@ -23,6 +24,7 @@ export default function LoginPage({ role }: LoginPageProps) {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isGithubPages, setIsGithubPages] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     setIsGithubPages(isGithubPagesRuntime());
@@ -54,97 +56,180 @@ export default function LoginPage({ role }: LoginPageProps) {
   const accent = isAdmin ? "from-violet-600 to-purple-700" : "from-indigo-600 to-blue-700";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50 px-4">
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
-        <div className="mb-6 text-center">
-          <div
-            className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-lg font-bold text-white shadow-md`}
-          >
-            {isAdmin ? "A" : "T"}
+    <div className="relative flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-white to-indigo-50 px-4 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 transition-colors duration-300">
+      {/* Theme Toggle */}
+      <div className="absolute right-6 top-6">
+        <ThemeToggle />
+      </div>
+
+      {/* Decorative elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -right-40 top-0 h-80 w-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 dark:opacity-10 animate-blob"></div>
+        <div className="absolute -left-40 top-40 h-80 w-80 bg-purple-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 dark:opacity-10 animate-blob animation-delay-2000"></div>
+        <div className="absolute right-1/3 -bottom-40 h-80 w-80 bg-pink-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 dark:opacity-10 animate-blob animation-delay-4000"></div>
+      </div>
+
+      {/* Main content */}
+      <div className="relative z-10 w-full max-w-md">
+        {/* Card */}
+        <div className="rounded-3xl border border-slate-200/50 bg-white/80 dark:border-slate-700/50 dark:bg-slate-900/80 backdrop-blur-xl p-8 shadow-2xl dark:shadow-2xl/20 transition-all duration-300">
+          {/* Header */}
+          <div className="mb-8 text-center">
+            <div
+              className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-2xl font-bold text-white shadow-lg ring-4 ring-offset-2 dark:ring-offset-slate-900 ring-indigo-100 dark:ring-slate-800 transition-transform duration-300 hover:scale-110`}
+            >
+              {isAdmin ? "A" : "T"}
+            </div>
+            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
+              {isAdmin ? "Admin Login" : "Teacher Login"}
+            </h1>
+            <p className="text-sm text-slate-600 dark:text-slate-400">
+              {isAdmin ? "Manage courses and teachers" : "Access your course materials"}
+            </p>
           </div>
-          <h1 className="text-2xl font-extrabold text-slate-800">
-            {isAdmin ? "Admin Login" : "Teacher Login"}
-          </h1>
+
+          {/* Demo credentials for admin */}
           {isAdmin && (
-            <p className="mt-1 text-sm text-slate-400">
-              Use admin credentials:{" "}
-              <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-indigo-600">
-                {ADMIN_ID} / {ADMIN_PASSWORD}
-              </code>
-            </p>
-          )}
-          {!isAdmin && (
-            <p className="mt-1 text-sm text-slate-400">
-              Enter your registered account credentials
-            </p>
-          )}
-        </div>
-
-        {!isAdmin && isGithubPages && (
-          <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">
-            Teacher login requires backend APIs and is not available on GitHub Pages.
-            Use a server deployment like Vercel for full functionality.
-          </p>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">
-              {isAdmin ? "Admin ID" : "Username or Email"}
-            </label>
-            <input
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              placeholder={isAdmin ? "Enter admin ID" : "username or email"}
-              required
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-600">
-              Password
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              placeholder="Enter password"
-              required
-            />
-          </div>
-
-          {error && (
-            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+            <div className="mb-6 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 p-3">
+              <div className="flex gap-2 items-start">
+                <FiCheckCircle className="mt-0.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" size={16} />
+                <div className="text-xs text-indigo-700 dark:text-indigo-300">
+                  <p className="font-semibold mb-1">Demo Credentials</p>
+                  <p className="font-mono">ID: {ADMIN_ID}</p>
+                  <p className="font-mono">Pass: {ADMIN_PASSWORD}</p>
+                </div>
+              </div>
+            </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className={`flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${accent} py-3 text-sm font-bold text-white shadow-md transition hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed`}
-          >
-            {loading ? <FiLoader className="animate-spin" /> : <FiLogIn />}
-            {loading ? "Signing In..." : "Sign In"}
-          </button>
-        </form>
+          {/* GitHub Pages warning */}
+          {!isAdmin && isGithubPages && (
+            <div className="mb-6 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 flex gap-2">
+              <FiAlertCircle className="mt-0.5 text-amber-600 dark:text-amber-400 flex-shrink-0" size={16} />
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Teacher login requires backend APIs. Not available on GitHub Pages. Use Vercel for full functionality.
+              </p>
+            </div>
+          )}
 
-        <div className="mt-6 space-y-3 text-center text-sm text-slate-400">
-          {!isAdmin && (
-            <>
-              <p>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Identifier input */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                {isAdmin ? "Admin ID" : "Username or Email"}
+              </label>
+              <div className="relative">
+                <input
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
+                  placeholder={isAdmin ? "Enter admin ID" : "username or email"}
+                  required
+                  disabled={loading}
+                />
+              </div>
+            </div>
+
+            {/* Password input */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
+                  placeholder="Enter password"
+                  required
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                  disabled={loading}
+                >
+                  {showPassword ? "Hide" : "Show"}
+                </button>
+              </div>
+            </div>
+
+            {/* Error message */}
+            {error && (
+              <div className="rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3 flex gap-2">
+                <FiAlertCircle className="mt-0.5 text-red-600 dark:text-red-400 flex-shrink-0" size={16} />
+                <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+              </div>
+            )}
+
+            {/* Submit button */}
+            <button
+              type="submit"
+              disabled={loading || !identifier || !password}
+              className={`w-full flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r ${accent} py-3 px-4 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100`}
+            >
+              {loading ? (
+                <>
+                  <FiLoader className="animate-spin" size={18} />
+                  <span>Signing In...</span>
+                </>
+              ) : (
+                <>
+                  <FiLogIn size={18} />
+                  <span>Sign In</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Footer links */}
+          <div className="mt-8 space-y-4 text-center text-sm">
+            {!isAdmin && (
+              <p className="text-slate-600 dark:text-slate-400">
                 Don't have an account?{" "}
-                <Link href="/register/teacher" className="text-indigo-600 font-medium hover:underline">
+                <Link
+                  href="/register/teacher"
+                  className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline transition-colors"
+                >
                   Create one
                 </Link>
               </p>
-              <hr className="my-2" />
-            </>
-          )}
-          <Link href="/" className="text-indigo-600 hover:underline">
-            ← Back to home
-          </Link>
+            )}
+            {!isAdmin && <div className="h-px bg-gradient-to-r from-transparent via-slate-300 dark:via-slate-600 to-transparent"></div>}
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors font-medium"
+            >
+              ← Back to home
+            </Link>
+          </div>
         </div>
+
+        {/* Bottom info */}
+        <p className="mt-6 text-center text-xs text-slate-500 dark:text-slate-400">
+          Protected by industry-standard encryption
+        </p>
       </div>
+
+      <style jsx>{`
+        @keyframes blob {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+      `}</style>
     </div>
   );
 }
