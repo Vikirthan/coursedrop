@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { hash, compare } from "bcryptjs";
+import { hash } from "bcryptjs";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
+import { sendPasswordResetOtpEmail } from "@/lib/email";
 
 interface ForgotPasswordPayload {
   email: string;
@@ -93,13 +94,17 @@ export async function POST(req: NextRequest) {
         );
 
       if (otpErr) {
-        console.error("OTP storage error:", otpErr);
-        // Continue anyway - in production, you'd handle this better
+        throw otpErr;
       }
 
-      // TODO: Send email with OTP using a service like SendGrid, AWS SES, etc.
-      // For now, log the OTP (INSECURE - for testing only)
-      console.log(`[PASSWORD_RESET] OTP for ${email}: ${otp}`);
+      await sendPasswordResetOtpEmail({
+        toEmail: email,
+        recipientName: teacher.full_name,
+        otp,
+        expiresInMinutes: 10,
+      });
+
+      console.info(`[PASSWORD_RESET] OTP email sent to ${email}`);
 
       return NextResponse.json(
         { success: true, message: "OTP sent to your email" },

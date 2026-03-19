@@ -60,3 +60,26 @@ That means on GitHub Pages:
 - Any backend-only feature will not work.
 
 For full functionality (APIs + auth + Drive), deploy to a server platform such as Vercel.
+
+## Required Environment Variables (Vercel)
+
+Set these in your Vercel Project Settings -> Environment Variables, then redeploy.
+
+```txt
+# Supabase (required for auth data)
+SUPABASE_SERVICE_ROLE_KEY=
+SUPABASE_URL=
+
+# OTP email delivery (required for forgot password)
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+# Optional display name in email subject
+APP_NAME=CourseDrop
+
+# Google Drive integration
+GOOGLE_SERVICE_ACCOUNT_EMAIL=
+GOOGLE_PRIVATE_KEY=
+GOOGLE_DRIVE_MASTER_FOLDER_ID=
+GOOGLE_DRIVE_SHARED_DRIVE_ID=
+GOOGLE_DRIVE_DELEGATED_USER_EMAIL=
+```
