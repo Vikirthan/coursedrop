@@ -4,6 +4,7 @@
 // ============================================================
 
 import Link from "next/link";
+import Image from "next/image";
 import {
   FiBookOpen,
   FiUploadCloud,
@@ -26,9 +27,14 @@ export default function HomePage() {
         {/* ---- Navbar ---- */}
         <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-sm font-bold text-white shadow-md ring-2 ring-offset-2 dark:ring-offset-slate-900 ring-indigo-200 dark:ring-slate-700">
-              CD
-            </div>
+            <Image
+              src="/icon.svg"
+              alt="CourseDrop logo"
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-xl shadow-md ring-2 ring-indigo-200 ring-offset-2 dark:ring-slate-700 dark:ring-offset-slate-900"
+              priority
+            />
             <span className="text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">CourseDrop</span>
           </div>
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">

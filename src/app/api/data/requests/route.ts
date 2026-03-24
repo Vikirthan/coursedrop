@@ -279,21 +279,44 @@ export async function PATCH(req: NextRequest) {
       );
     }
 
-    const query = supabase
+    const { data: approvedCandidates, error: approvedError } = await supabase
       .from("subject_requests")
-      .update(updateData)
-      .ilike("course_code", courseCode)
-      .eq("status", "approved");
+      .select("id,course_code")
+      .eq("status", "approved")
+      .ilike("course_code", `${courseCode}%`);
 
-    const { data, error } = await query
-      .select("id,teacher_id,teacher_name,teacher_email,department,subject_name,course_code,message,status,created_at,updated_at,drive_folder_id");
+    if (approvedError) {
+      throw approvedError;
+    }
 
-    if (error) {
-      throw error;
+    const requestIds = (approvedCandidates ?? [])
+      .filter((row) => {
+        const normalized = String((row as { course_code?: unknown }).course_code ?? "")
+          .trim()
+          .toUpperCase();
+        return normalized === courseCode;
+      })
+      .map((row) => String((row as { id?: unknown }).id ?? "").trim())
+      .filter((value) => value.length > 0);
+
+    let data: RequestRow[] = [];
+
+    if (requestIds.length > 0) {
+      const result = await supabase
+        .from("subject_requests")
+        .update(updateData)
+        .in("id", requestIds)
+        .select("id,teacher_id,teacher_name,teacher_email,department,subject_name,course_code,message,status,created_at,updated_at,drive_folder_id");
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      data = (result.data ?? []) as RequestRow[];
     }
 
     return NextResponse.json(
-      { requests: (data ?? []).map((row) => toSubjectRequest(row as RequestRow)) },
+      { requests: data.map((row) => toSubjectRequest(row)) },
       { headers: NO_STORE_HEADERS }
     );
   } catch (err: unknown) {

@@ -6,6 +6,7 @@
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { apiListFiles, apiListSubjects } from "@/lib/clientDataApi";
 import { Subject, StudyFile } from "@/lib/types";
 import { EmptyState } from "@/components/ui";
@@ -234,9 +235,7 @@ export default function StudentPortal() {
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-sm font-bold text-white">
-              CD
-            </div>
+            <Image src="/icon.svg" alt="CourseDrop logo" width={36} height={36} className="h-9 w-9 rounded-xl" priority />
             <span className="text-lg font-extrabold text-slate-800">CourseDrop</span>
           </Link>
           <div className="flex w-full flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:w-auto sm:gap-3 sm:text-sm">

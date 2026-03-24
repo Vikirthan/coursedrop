@@ -5,6 +5,7 @@
 
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -50,9 +51,7 @@ export default function Sidebar() {
     <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:h-screen md:w-64 md:border-b-0 md:border-r">
       {/* brand */}
       <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-4 md:px-6 md:py-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-sm font-bold text-white">
-          CD
-        </div>
+        <Image src="/icon.svg" alt="CourseDrop logo" width={40} height={40} className="h-10 w-10 rounded-xl" priority />
         <span className="text-lg font-bold text-slate-800">CourseDrop</span>
       </div>
 

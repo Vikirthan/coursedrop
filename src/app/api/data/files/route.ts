@@ -352,21 +352,57 @@ export async function DELETE(req: NextRequest) {
     }
 
     const supabase = getSupabaseAdminClient();
-    let query = supabase.from("study_files").delete();
+    let deletedCount = 0;
 
     if (fileId) {
-      query = query.eq("id", fileId);
-    } else {
-      query = query.ilike("course_code", courseCode);
-    }
+      const { data, error } = await supabase
+        .from("study_files")
+        .delete()
+        .eq("id", fileId)
+        .select("id");
 
-    const { data, error } = await query.select("id");
-    if (error) {
-      throw error;
+      if (error) {
+        throw error;
+      }
+
+      deletedCount = data?.length ?? 0;
+    } else {
+      const { data: candidates, error: candidateError } = await supabase
+        .from("study_files")
+        .select("id,course_code")
+        .ilike("course_code", `${courseCode}%`);
+
+      if (candidateError) {
+        throw candidateError;
+      }
+
+      const idsToDelete = (candidates ?? [])
+        .filter((row) => {
+          const normalized = String((row as { course_code?: unknown }).course_code ?? "")
+            .trim()
+            .toUpperCase();
+          return normalized === courseCode;
+        })
+        .map((row) => String((row as { id?: unknown }).id ?? "").trim())
+        .filter((id) => id.length > 0);
+
+      if (idsToDelete.length > 0) {
+        const { data, error } = await supabase
+          .from("study_files")
+          .delete()
+          .in("id", idsToDelete)
+          .select("id");
+
+        if (error) {
+          throw error;
+        }
+
+        deletedCount = data?.length ?? 0;
+      }
     }
 
     return NextResponse.json(
-      { success: true, deleted: data?.length ?? 0 },
+      { success: true, deleted: deletedCount },
       { headers: NO_STORE_HEADERS }
     );
   } catch (err: unknown) {
