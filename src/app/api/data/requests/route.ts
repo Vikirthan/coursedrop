@@ -282,8 +282,7 @@ export async function PATCH(req: NextRequest) {
     const { data: approvedCandidates, error: approvedError } = await supabase
       .from("subject_requests")
       .select("id,course_code")
-      .eq("status", "approved")
-      .ilike("course_code", `${courseCode}%`);
+      .eq("status", "approved");
 
     if (approvedError) {
       throw approvedError;

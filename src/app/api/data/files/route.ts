@@ -369,8 +369,7 @@ export async function DELETE(req: NextRequest) {
     } else {
       const { data: candidates, error: candidateError } = await supabase
         .from("study_files")
-        .select("id,course_code")
-        .ilike("course_code", `${courseCode}%`);
+        .select("id,course_code");
 
       if (candidateError) {
         throw candidateError;
