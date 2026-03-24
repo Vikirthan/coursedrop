@@ -243,6 +243,7 @@ export default function AdminMaterialsPage() {
       ]);
 
       setShowDeleteFolderModal(false);
+      setSelectedCourse(null);
       toast.success("Folder and related course files deleted");
       await refresh();
     } catch (err) {
@@ -385,8 +386,8 @@ export default function AdminMaterialsPage() {
               key={f.id}
               file={f}
               onDelete={(id) => setDeleteTarget(id)}
-              onDownload={() =>
-                toast.success("Download started (mock)")
+              onDownload={(file) =>
+                window.open(`/api/drive/download?fileId=${file.driveFileId}`, "_blank")
               }
             />
           ))}

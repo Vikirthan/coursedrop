@@ -1,11 +1,10 @@
 "use client";
 // ============================================================
-// CourseDrop — Auth Context (dummy auth with localStorage)
+// CourseDrop — Auth Context
 // ============================================================
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@/lib/types";
-import { CREDENTIALS, DUMMY_USERS } from "@/lib/mockData";
 import { isGithubPagesRuntime } from "@/lib/runtime";
 
 interface AuthState {
@@ -45,13 +44,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     role: "admin" | "teacher"
   ): Promise<string | null> => {
     if (role === "admin") {
-      const cred = CREDENTIALS[identifier];
-      if (!cred || cred.password !== password) return "Invalid credentials";
-      const u = DUMMY_USERS.find((u) => u.id === cred.userId && u.role === "admin");
-      if (!u) return "User not found";
-      setUser(u);
-      localStorage.setItem("coursedrop_user", JSON.stringify(u));
-      return null;
+      if (isGithubPagesRuntime()) {
+        return "Admin login needs backend APIs and is disabled on GitHub Pages. Deploy to Vercel for full login support.";
+      }
+
+      try {
+        const res = await fetch("/api/auth/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ identifier, password }),
+        });
+
+        const data = (await res.json()) as { error?: string; user?: User };
+        if (!res.ok) {
+          return data.error ?? "Login failed";
+        }
+
+        if (!data.user) {
+          return "Login failed";
+        }
+
+        setUser(data.user);
+        localStorage.setItem("coursedrop_user", JSON.stringify(data.user));
+        return null;
+      } catch {
+        return "Network error. Try again.";
+      }
     }
 
     if (isGithubPagesRuntime()) {

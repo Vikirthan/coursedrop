@@ -99,12 +99,16 @@ export default function TeacherUploadPage() {
         apiGetTeacherSharedCourses(user.id, user.username, user.email),
       ]);
 
-      setAllApprovedRequests(approvedRequests);
+      const activeApprovedRequests = approvedRequests.filter(
+        (request) => (request.driveFolderId ?? "").trim().length > 0
+      );
+
+      setAllApprovedRequests(activeApprovedRequests);
 
       const ownedCourseSet = new Set<string>();
       const accessibleByCourse = new Map<string, SubjectRequest>();
 
-      for (const request of approvedRequests) {
+      for (const request of activeApprovedRequests) {
         if (
           teacherKeySet.has(request.teacherId) ||
           teacherEmailSet.has(request.teacherEmail.trim().toLowerCase())
@@ -120,7 +124,7 @@ export default function TeacherUploadPage() {
         if (accessibleByCourse.has(courseCode)) {
           continue;
         }
-        const match = approvedRequests.find((request) => request.courseCode === courseCode);
+        const match = activeApprovedRequests.find((request) => request.courseCode === courseCode);
         if (match) {
           accessibleByCourse.set(courseCode, match);
         }
@@ -411,7 +415,7 @@ export default function TeacherUploadPage() {
 
     try {
       // Delete from Google Drive
-      if (file && file.driveFileId && !file.driveFileId.startsWith("mock-")) {
+      if (file && file.driveFileId) {
         const res = await fetch(`/api/drive/delete?fileId=${file.driveFileId}`, {
           method: "DELETE",
         });

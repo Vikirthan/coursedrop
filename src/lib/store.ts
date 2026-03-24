@@ -11,7 +11,6 @@ import {
   BugReport,
   BugReportStatus,
 } from "./types";
-import { SEED_REQUESTS, SEED_FILES } from "./mockData";
 
 const REQUESTS_KEY = "coursedrop_requests";
 const FILES_KEY = "coursedrop_files";
@@ -49,7 +48,7 @@ function createLocalId(prefix: string): string {
 // ---- Subject Requests ----
 
 export function getRequests(): SubjectRequest[] {
-  return loadJSON<SubjectRequest[]>(REQUESTS_KEY, SEED_REQUESTS);
+  return loadJSON<SubjectRequest[]>(REQUESTS_KEY, []);
 }
 
 export function addRequest(req: SubjectRequest) {
@@ -225,7 +224,7 @@ export function clearDriveFolderIdForCourse(courseCode: string) {
 // ---- Files ----
 
 export function getFiles(): StudyFile[] {
-  return loadJSON<StudyFile[]>(FILES_KEY, SEED_FILES);
+  return loadJSON<StudyFile[]>(FILES_KEY, []);
 }
 
 export function getFilesByCourse(courseCode: string): StudyFile[] {

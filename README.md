@@ -84,18 +84,15 @@ GOOGLE_DRIVE_SHARED_DRIVE_ID=
 
 # Optional admin hardening
 ADMIN_DELETE_PASSWORD=
+
+# Admin login
+ADMIN_LOGIN_ID=
+ADMIN_LOGIN_PASSWORD=
 ```
 
-## Demo Admin Login
-
-Current demo credentials:
-
-```txt
-Admin ID: 12307334
-Password: Vikirthan@819
-```
-
-Use only for development/demo environments.
+Notes:
+- `ADMIN_LOGIN_ID` and `ADMIN_LOGIN_PASSWORD` are required for admin sign-in.
+- `ADMIN_DELETE_PASSWORD` is required for deleting full course folders from admin interface.
 
 ## Database Setup (Supabase)
 
@@ -184,6 +181,7 @@ What works on GitHub Pages:
 
 What does not work on GitHub Pages:
 - Teacher authentication and registration APIs
+- Admin authentication API
 - Drive upload/download APIs
 - Any backend-only logic
 

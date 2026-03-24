@@ -146,10 +146,6 @@ export default function StudentPortal() {
   // ---- Download handlers ----
 
   const handleSingleDownload = useCallback((file: StudyFile) => {
-    if (file.driveFileId.startsWith("mock-")) {
-      toast.error("This is a demo file and can't be downloaded.");
-      return;
-    }
     window.open(`/api/drive/download?fileId=${file.driveFileId}`, "_blank");
   }, []);
 
@@ -176,24 +172,15 @@ export default function StudentPortal() {
       ? files.filter((f) => selectedFiles.has(f.id))
       : files;
 
-    const realFiles = toDownload.filter(
-      (f) => !f.driveFileId.startsWith("mock-")
-    );
-
-    if (realFiles.length === 0) {
-      toast.error("No real Drive files selected (demo files can't be downloaded).");
-      return;
-    }
-
     // If only one file, just do a single download
-    if (realFiles.length === 1) {
-      handleSingleDownload(realFiles[0]);
+    if (toDownload.length === 1) {
+      handleSingleDownload(toDownload[0]);
       return;
     }
 
     setDownloading(true);
     try {
-      const fileIds = realFiles.map((f) => f.driveFileId);
+      const fileIds = toDownload.map((f) => f.driveFileId);
       const zipName = selectedSubject
         ? `${selectedSubject.courseCode}-${selectedSubject.subjectName}`
         : "CourseDrop-Materials";
@@ -220,7 +207,7 @@ export default function StudentPortal() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      toast.success(`Downloaded ${realFiles.length} files as ZIP`);
+      toast.success(`Downloaded ${toDownload.length} files as ZIP`);
     } catch (err) {
       console.error(err);
       toast.error(err instanceof Error ? err.message : "Download failed");

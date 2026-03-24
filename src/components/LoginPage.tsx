@@ -6,11 +6,10 @@
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { ADMIN_ID, ADMIN_PASSWORD } from "@/lib/mockData";
 import { isGithubPagesRuntime } from "@/lib/runtime";
 import ThemeToggle from "@/components/ThemeToggle";
 import Link from "next/link";
-import { FiLogIn, FiLoader, FiAlertCircle, FiCheckCircle } from "react-icons/fi";
+import { FiLogIn, FiLoader, FiAlertCircle } from "react-icons/fi";
 
 interface LoginPageProps {
   role: "admin" | "teacher";
@@ -87,20 +86,6 @@ export default function LoginPage({ role }: LoginPageProps) {
               {isAdmin ? "Manage courses and teachers" : "Access your course materials"}
             </p>
           </div>
-
-          {/* Demo credentials for admin */}
-          {isAdmin && (
-            <div className="mb-6 rounded-xl bg-indigo-50 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-800 p-3">
-              <div className="flex gap-2 items-start">
-                <FiCheckCircle className="mt-0.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" size={16} />
-                <div className="text-xs text-indigo-700 dark:text-indigo-300">
-                  <p className="font-semibold mb-1">Demo Credentials</p>
-                  <p className="font-mono">ID: {ADMIN_ID}</p>
-                  <p className="font-mono">Pass: {ADMIN_PASSWORD}</p>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* GitHub Pages warning */}
           {!isAdmin && isGithubPages && (

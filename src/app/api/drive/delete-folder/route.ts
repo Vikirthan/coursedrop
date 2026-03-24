@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { compare } from "bcryptjs";
 import { getDriveClient } from "@/lib/drive";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
-import { ADMIN_PASSWORD } from "@/lib/mockData";
 
 interface DeleteFolderPayload {
   folderId: string;
@@ -54,7 +53,13 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (asAdmin) {
-      const expected = (process.env.ADMIN_DELETE_PASSWORD ?? ADMIN_PASSWORD).trim();
+      const expected = (process.env.ADMIN_DELETE_PASSWORD ?? "").trim();
+      if (!expected) {
+        return NextResponse.json(
+          { error: "ADMIN_DELETE_PASSWORD is not configured" },
+          { status: 500 }
+        );
+      }
       if (!adminPassword.trim()) {
         return NextResponse.json(
           { error: "Admin password is required" },

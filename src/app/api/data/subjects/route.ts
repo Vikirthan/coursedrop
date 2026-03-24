@@ -15,6 +15,7 @@ type RequestRow = {
   course_code: string;
   subject_name: string;
   department: string;
+  drive_folder_id: string | null;
 };
 
 type FileRow = {
@@ -60,7 +61,7 @@ export async function GET() {
       await Promise.all([
         supabase
           .from("subject_requests")
-          .select("course_code,subject_name,department")
+          .select("course_code,subject_name,department,drive_folder_id")
           .eq("status", "approved"),
         supabase.from("study_files").select("course_code,subject_name"),
       ]);
@@ -76,7 +77,13 @@ export async function GET() {
 
     for (const req of (approvedRequests ?? []) as RequestRow[]) {
       const courseCode = (req.course_code ?? "").trim().toUpperCase();
+      const driveFolderId = (req.drive_folder_id ?? "").trim();
       if (!courseCode) {
+        continue;
+      }
+
+      // Hide courses that no longer have an active Drive folder.
+      if (!driveFolderId) {
         continue;
       }
 
