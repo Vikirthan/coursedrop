@@ -6,7 +6,6 @@
 import Link from "next/link";
 import {
   FiBookOpen,
-  FiShield,
   FiUploadCloud,
   FiUsers,
   FiArrowRight,
@@ -25,58 +24,58 @@ export default function HomePage() {
 
       <div className="relative z-10">
         {/* ---- Navbar ---- */}
-        <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-5">
+        <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-sm font-bold text-white shadow-md ring-2 ring-offset-2 dark:ring-offset-slate-900 ring-indigo-200 dark:ring-slate-700">
               CD
             </div>
-            <span className="text-xl font-extrabold text-slate-900 dark:text-white">CourseDrop</span>
+            <span className="text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">CourseDrop</span>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">
             <Link
               href="/login/teacher"
-              className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+              className="rounded-lg px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:px-4 sm:text-sm"
             >
               Teacher Login
             </Link>
             <Link
               href="/student"
-              className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white shadow-md hover:bg-indigo-700 dark:hover:bg-indigo-500 transition-colors"
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-md transition-colors hover:bg-indigo-700 dark:hover:bg-indigo-500 sm:px-5 sm:text-sm"
             >
               Student Portal
             </Link>
-            <div className="ml-2 pl-2 border-l border-slate-200 dark:border-slate-700">
+            <div className="ml-1 border-l border-slate-200 pl-2 dark:border-slate-700 sm:ml-2">
               <ThemeToggle />
             </div>
           </div>
         </nav>
 
         {/* ---- Hero ---- */}
-        <section className="mx-auto max-w-4xl px-6 pb-20 pt-20 text-center">
+        <section className="mx-auto max-w-4xl px-4 pb-14 pt-12 text-center sm:px-6 sm:pb-20 sm:pt-20">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full bg-indigo-100 dark:bg-indigo-950/40 px-4 py-2 text-xs font-semibold text-indigo-700 dark:text-indigo-300 ring-1 ring-indigo-200 dark:ring-indigo-900">
             <FiBookOpen /> Academic Material Portal
           </div>
-          <h1 className="text-5xl font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white md:text-6xl">
+          <h1 className="text-3xl font-extrabold leading-tight tracking-tight text-slate-900 dark:text-white sm:text-4xl md:text-6xl">
             Your Course Materials,{" "}
             <span className="bg-gradient-to-r from-indigo-600 to-violet-600 bg-clip-text text-transparent dark:from-indigo-400 dark:to-violet-400">
               One Click Away
             </span>
           </h1>
-          <p className="mx-auto mt-5 max-w-2xl text-lg text-slate-600 dark:text-slate-400">
+          <p className="mx-auto mt-5 max-w-2xl text-base text-slate-600 dark:text-slate-400 sm:text-lg">
             CourseDrop lets teachers share lecture notes, slides, and lab manuals —
             and students can access them instantly, no login required.
           </p>
 
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3 sm:mt-10 sm:gap-4">
             <Link
               href="/student"
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-700 px-7 py-3 text-sm font-bold text-white shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-[1.02] active:scale-95"
+              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-blue-700 px-5 py-2.5 text-xs font-bold text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:shadow-xl active:scale-95 sm:px-7 sm:py-3 sm:text-sm"
             >
               Browse Materials <FiArrowRight />
             </Link>
             <Link
               href="/login/teacher"
-              className="flex items-center gap-2 rounded-xl border border-slate-300 dark:border-slate-600 px-7 py-3 text-sm font-bold text-slate-700 dark:text-slate-300 transition-all duration-200 hover:bg-slate-100 dark:hover:bg-slate-800 active:scale-95"
+              className="flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-2.5 text-xs font-bold text-slate-700 transition-all duration-200 hover:bg-slate-100 active:scale-95 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 sm:px-7 sm:py-3 sm:text-sm"
             >
               Teacher Portal
             </Link>
@@ -84,7 +83,7 @@ export default function HomePage() {
         </section>
 
         {/* ---- Features ---- */}
-        <section className="mx-auto max-w-5xl px-6 pb-24">
+        <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 sm:pb-24">
           <div className="grid gap-6 md:grid-cols-3">
             {[
               {
@@ -96,11 +95,6 @@ export default function HomePage() {
                 icon: <FiUsers size={28} />,
                 title: "Access Control",
                 desc: "Admins approve teacher access per subject. Students browse without logging in.",
-              },
-              {
-                icon: <FiShield size={28} />,
-                title: "Google Drive Backed",
-                desc: "All files are stored on Google Drive — organized by course code — for reliable access.",
               },
             ].map((f) => (
               <div

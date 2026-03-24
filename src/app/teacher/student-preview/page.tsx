@@ -305,16 +305,16 @@ export default function TeacherStudentPreviewPage() {
             <FiArrowLeft /> Back to subjects
           </button>
 
-          <div className="mb-6 flex items-start justify-between gap-3">
+          <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start">
             <div>
-              <h1 className="text-2xl font-extrabold text-slate-800">{selectedSubject.subjectName}</h1>
+              <h1 className="text-xl font-extrabold text-slate-800 sm:text-2xl">{selectedSubject.subjectName}</h1>
               <p className="text-sm text-slate-400">
                 {selectedSubject.courseCode} &middot; {selectedSubject.department} &middot; {files.length} file(s)
               </p>
             </div>
 
             {files.length > 0 && (
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                 <button
                   onClick={handleSelectAll}
                   className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
@@ -365,7 +365,7 @@ export default function TeacherStudentPreviewPage() {
       ) : (
         <>
           <div className="mb-6">
-            <h1 className="text-2xl font-extrabold text-slate-800">Student View by Subject</h1>
+            <h1 className="text-xl font-extrabold text-slate-800 sm:text-2xl">Student View by Subject</h1>
             <p className="text-sm text-slate-400">
               Choose a subject to preview exactly what students see.
             </p>

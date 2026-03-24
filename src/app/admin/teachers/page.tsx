@@ -115,11 +115,11 @@ export default function AdminTeachersPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
       {/* Header */}
       <div className="border-b border-slate-200 bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-6">
+        <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
           <Link href="/admin" className="mb-4 inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700">
             <FiArrowLeft size={18} /> Admin Dashboard
           </Link>
-          <h1 className="text-3xl font-extrabold text-slate-800">
+          <h1 className="text-2xl font-extrabold text-slate-800 sm:text-3xl">
             Teacher Approvals
           </h1>
           <p className="mt-2 text-slate-500">
@@ -128,9 +128,9 @@ export default function AdminTeachersPage() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-10">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
         {/* Tabs */}
-        <div className="mb-6 flex items-center gap-4 border-b border-slate-200">
+        <div className="mb-6 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-2 sm:gap-4 sm:pb-0">
           <button
             onClick={() => setFilter("pending")}
             className={`px-4 py-3 text-sm font-medium transition ${
@@ -153,7 +153,7 @@ export default function AdminTeachersPage() {
           </button>
           <button
             onClick={fetchTeachers}
-            className="ml-auto flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100"
+            className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 sm:ml-auto"
             disabled={loading}
           >
             <FiRefreshCw size={16} className={loading ? "animate-spin" : ""} />
@@ -186,14 +186,14 @@ export default function AdminTeachersPage() {
             {displayTeachers.map((teacher) => (
               <div
                 key={teacher.id}
-                className="rounded-lg border border-slate-200 bg-white p-5 hover:border-slate-300 transition"
+                className="rounded-lg border border-slate-200 bg-white p-4 transition hover:border-slate-300 sm:p-5"
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-start">
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-slate-800">
                       {teacher.full_name}
                     </h3>
-                    <div className="mt-2 grid grid-cols-2 gap-3 text-sm text-slate-600">
+                    <div className="mt-2 grid grid-cols-1 gap-3 text-sm text-slate-600 sm:grid-cols-2">
                       <div>
                         <p className="text-xs font-medium text-slate-500">UID</p>
                         <p className="font-mono">{teacher.uid}</p>
@@ -214,7 +214,7 @@ export default function AdminTeachersPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2">
+                  <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
                     {!teacher.approved && (
                       <>
                         <button

@@ -104,7 +104,7 @@ export function SectionHeader({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="mb-4 flex items-center justify-between">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
       <h2 className="text-xl font-bold text-slate-800">{title}</h2>
       {action}
     </div>

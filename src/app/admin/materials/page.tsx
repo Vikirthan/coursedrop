@@ -262,7 +262,7 @@ export default function AdminMaterialsPage() {
       <div className="mb-6 flex flex-wrap gap-2">
         <button
           onClick={() => setSelectedCourse(null)}
-          className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+          className={`rounded-xl px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
             !selectedCourse
               ? "bg-indigo-600 text-white"
               : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -274,7 +274,7 @@ export default function AdminMaterialsPage() {
           <button
             key={s.courseCode}
             onClick={() => setSelectedCourse(s.courseCode)}
-            className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+            className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
               selectedCourse === s.courseCode
                 ? "bg-indigo-600 text-white"
                 : "bg-slate-100 text-slate-600 hover:bg-slate-200"
@@ -290,7 +290,7 @@ export default function AdminMaterialsPage() {
       </div>
 
       {selectedCourse && (
-        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
@@ -303,7 +303,7 @@ export default function AdminMaterialsPage() {
             <button
               onClick={handleSaveSharing}
               disabled={!sharingDirty || savingSharing}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
               {savingSharing ? <FiLoader className="animate-spin" /> : <FiSave />}
               Save Sharing
@@ -313,7 +313,7 @@ export default function AdminMaterialsPage() {
           <div className="mb-4">
             <button
               onClick={handleDeleteFolderClick}
-              className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 sm:w-auto"
             >
               <FiTrash2 /> Delete Whole Folder (Admin)
             </button>

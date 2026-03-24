@@ -142,8 +142,8 @@ export default function TeacherDashboard() {
 
       {/* Recent requests */}
       <SectionHeader title="My Recent Requests" />
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <table className="w-full text-left text-sm">
+      <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <table className="w-full min-w-[640px] text-left text-sm">
           <thead className="border-b border-slate-100 bg-slate-50/50 text-xs uppercase text-slate-400">
             <tr>
               <th className="px-5 py-3">Subject</th>

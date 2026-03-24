@@ -528,14 +528,14 @@ export default function TeacherUploadPage() {
             <button
               key={s.courseCode}
               onClick={() => setSelectedCourse(s.courseCode)}
-              className={`flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm ${
                 selectedCourse === s.courseCode
                   ? "bg-indigo-600 text-white"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
               }`}
             >
               <FiFolder size={14} />
-              {s.subjectName} ({s.courseCode})
+              <span className="max-w-[170px] truncate sm:max-w-[260px]">{s.subjectName} ({s.courseCode})</span>
               {!ownedCourseCodes.includes(s.courseCode) && (
                 <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
                   Shared
@@ -591,10 +591,10 @@ export default function TeacherUploadPage() {
 
             {uploading && uploadProgress && (
               <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                <div className="mb-2 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-700">
                     <FiLoader className="animate-spin text-indigo-500" />
-                    <span>
+                    <span className="truncate">
                       Uploading {Math.min(uploadProgress.completedFiles + 1, uploadProgress.totalFiles)}/
                       {uploadProgress.totalFiles}: {uploadProgress.currentFileName}
                     </span>

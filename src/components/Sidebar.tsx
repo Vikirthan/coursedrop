@@ -47,9 +47,9 @@ export default function Sidebar() {
   const nav = user?.role === "admin" ? adminNav : teacherNav;
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-slate-200 bg-white">
+    <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:h-screen md:w-64 md:border-b-0 md:border-r">
       {/* brand */}
-      <div className="flex items-center gap-2 border-b border-slate-100 px-6 py-5">
+      <div className="flex items-center gap-2 border-b border-slate-100 px-4 py-4 md:px-6 md:py-5">
         <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-sm font-bold text-white">
           CD
         </div>
@@ -57,14 +57,15 @@ export default function Sidebar() {
       </div>
 
       {/* nav */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 overflow-x-auto px-2 py-3 md:space-y-1 md:px-3 md:py-4">
+        <div className="flex min-w-max gap-2 md:block md:min-w-0 md:space-y-1 md:gap-0">
         {nav.map((item) => {
           const active = pathname === item.href;
           return (
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-4 py-2.5 text-sm font-medium transition-all ${
+              className={`flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium whitespace-nowrap transition-all md:gap-3 md:px-4 md:py-2.5 ${
                 active
                   ? "bg-indigo-50 text-indigo-700"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -75,10 +76,11 @@ export default function Sidebar() {
             </Link>
           );
         })}
+        </div>
       </nav>
 
       {/* footer */}
-      <div className="border-t border-slate-100 px-4 py-4">
+      <div className="border-t border-slate-100 px-3 py-3 md:px-4 md:py-4">
         <Link
           href="/"
           className="mb-2 flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-50 hover:text-slate-600"

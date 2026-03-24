@@ -52,14 +52,14 @@ export default function UploadZone({ onFilesSelected, uploading }: UploadZonePro
       onDragLeave={() => setDragActive(false)}
       onDrop={onDrop}
       onClick={() => inputRef.current?.click()}
-      className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-10 text-center transition-all ${
+      className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 text-center transition-all sm:p-10 ${
         dragActive
           ? "border-indigo-400 bg-indigo-50"
           : "border-slate-300 bg-slate-50 hover:border-indigo-300 hover:bg-indigo-50/50"
       } ${uploading ? "pointer-events-none opacity-50" : ""}`}
     >
-      <FiUploadCloud className="mb-3 text-indigo-400" size={40} />
-      <p className="font-semibold text-slate-700">
+      <FiUploadCloud className="mb-3 text-indigo-400" size={34} />
+      <p className="text-sm font-semibold text-slate-700 sm:text-base">
         {uploading ? "Uploading…" : "Drag & drop files here"}
       </p>
       <p className="mt-1 text-xs text-slate-400">

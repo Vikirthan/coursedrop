@@ -1,104 +1,105 @@
 # CourseDrop
 
-CourseDrop is a Next.js app for managing course materials with roles for students, teachers, and admin.
+CourseDrop is a role-based study material portal built with Next.js.
 
-## Local Development
+It supports:
+- Students: browse and download materials without login.
+- Teachers: request subject access, upload files, preview student view.
+- Admins: approve requests and teachers, manage all materials and sharing.
 
-Install dependencies and run:
+## Tech Stack
+
+- Next.js (App Router)
+- TypeScript
+- Tailwind CSS v4
+- Supabase (data + auth backing)
+- Google Drive API (file storage)
+
+## Key Features
+
+- Subject-wise file organization with section tagging
+- Role-based access and approvals
+- Shared course access between approved teachers
+- Batch file downloads as ZIP
+- Bug reporting flow
+- Dark mode support
+- Responsive layout for laptop, tablet, mobile, and orientation changes
+
+## Getting Started
+
+### 1. Install dependencies
 
 ```bash
 npm install
+```
+
+### 2. Run development server
+
+```bash
 npm run dev
 ```
 
-Local URL:
+Open http://localhost:3000.
 
-```txt
-http://localhost:3000
-```
-
-## Admin Login (Demo)
-
-Admin login in this project currently uses client-side demo credentials:
-
-```txt
-Admin ID: 12307334
-Password: Vikirthan@819
-```
-
-## GitHub Pages Deployment
-
-This repo is configured with npm scripts to publish a static build to the `gh-pages` branch.
-
-Use:
+## Available Scripts
 
 ```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run build:gh-pages
 npm run deploy:gh-pages
-```
-
-or:
-
-```bash
 npm run deploy
 ```
 
-After push, enable GitHub Pages in repository settings:
+## Environment Variables
 
-1. Open Settings -> Pages.
-2. Set Source to Deploy from a branch.
-3. Select `gh-pages` branch and `/ (root)`.
-4. Save.
+Create a .env.local file for local development and configure the same values in production.
 
-## Important Hosting Note
-
-GitHub Pages only serves static files. This project also has Next.js API routes under `src/app/api/*`.
-
-That means on GitHub Pages:
-
-- Teacher registration/login APIs will not run.
-- Drive upload/download APIs will not run.
-- Any backend-only feature will not work.
-
-For full functionality (APIs + auth + Drive), deploy to a server platform such as Vercel.
-
-## Required Environment Variables (Vercel)
-
-Set these in your Vercel Project Settings -> Environment Variables, then redeploy.
-
-```txt
-# Supabase (required for auth data)
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
-SUPABASE_URL=
 
-# OTP email delivery (required for forgot password)
+# Email (forgot-password OTP)
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=
-# Optional display name in email subject
 APP_NAME=CourseDrop
 
-# Google Drive integration (choose one auth mode)
-# Mode A (personal Gmail): OAuth
+# Google Drive (choose one mode)
+# Mode A: OAuth
 GOOGLE_OAUTH_CLIENT_ID=
 GOOGLE_OAUTH_CLIENT_SECRET=
 GOOGLE_OAUTH_REFRESH_TOKEN=
 
-# Mode B (service account)
+# Mode B: Service Account
 GOOGLE_SERVICE_ACCOUNT_EMAIL=
 GOOGLE_PRIVATE_KEY=
 GOOGLE_DRIVE_DELEGATED_USER_EMAIL=
 
-# Required in both modes (folder/root to store course folders)
+# Drive root configuration
 GOOGLE_DRIVE_MASTER_FOLDER_ID=
-# Optional fallback root (Shared Drive root)
 GOOGLE_DRIVE_SHARED_DRIVE_ID=
 
 # Optional admin hardening
 ADMIN_DELETE_PASSWORD=
 ```
 
-## Supabase Tables Required For Cross-Device Sync
+## Demo Admin Login
 
-Run this once in Supabase SQL Editor so requests, files, sharing, and bug reports are shared across devices.
+Current demo credentials:
+
+```txt
+Admin ID: 12307334
+Password: Vikirthan@819
+```
+
+Use only for development/demo environments.
+
+## Database Setup (Supabase)
+
+Run the following SQL once in Supabase SQL Editor:
 
 ```sql
 create table if not exists public.subject_requests (
@@ -161,3 +162,52 @@ create table if not exists public.bug_reports (
 create index if not exists idx_bug_reports_status on public.bug_reports (status);
 create index if not exists idx_bug_reports_created_at on public.bug_reports (created_at desc);
 ```
+
+## Deployment
+
+### Recommended: Vercel
+
+Deploy on Vercel for full functionality (API routes, auth, Drive operations, email).
+
+### GitHub Pages (Static Only)
+
+This project includes API routes under src/app/api, which do not run on GitHub Pages.
+
+The repository provides a static export workflow:
+
+```bash
+npm run deploy:gh-pages
+```
+
+What works on GitHub Pages:
+- Static UI routes
+
+What does not work on GitHub Pages:
+- Teacher authentication and registration APIs
+- Drive upload/download APIs
+- Any backend-only logic
+
+## Project Structure
+
+```txt
+src/
+	app/
+		admin/
+		teacher/
+		student/
+		api/
+	components/
+	context/
+	lib/
+scripts/
+```
+
+## Troubleshooting
+
+- If Supabase requests fail, verify NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set exactly.
+- If uploads fail with service account quota errors, use Shared Drive configuration and verify Drive env values.
+- If dark mode does not react, ensure globals.css keeps the custom dark variant required by Tailwind v4.
+
+## License
+
+This project is intended for educational and institutional use. Add your preferred license before public distribution.

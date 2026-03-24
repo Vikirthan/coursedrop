@@ -232,14 +232,14 @@ export default function StudentPortal() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50">
       {/* ---- Header ---- */}
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-sm font-bold text-white">
               CD
             </div>
             <span className="text-lg font-extrabold text-slate-800">CourseDrop</span>
           </Link>
-          <div className="flex items-center gap-3 text-sm text-slate-500">
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 text-xs text-slate-500 sm:w-auto sm:gap-3 sm:text-sm">
             <div className="flex items-center gap-2">
               <FiBookOpen />
               <span className="font-semibold">Student Portal</span>
@@ -254,7 +254,7 @@ export default function StudentPortal() {
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         {/* If viewing a specific subject's files */}
         {selectedCourse && selectedSubject ? (
           <>
@@ -265,9 +265,9 @@ export default function StudentPortal() {
               <FiArrowLeft /> Back to subjects
             </button>
 
-            <div className="mb-6 flex items-start justify-between">
+            <div className="mb-6 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-start">
               <div>
-                <h1 className="text-2xl font-extrabold text-slate-800">
+                <h1 className="text-xl font-extrabold text-slate-800 sm:text-2xl">
                   {selectedSubject.subjectName}
                 </h1>
                 <p className="text-sm text-slate-400">
@@ -278,7 +278,7 @@ export default function StudentPortal() {
 
               {/* Batch Download Controls */}
               {files.length > 0 && (
-                <div className="flex items-center gap-2">
+                <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
                   <button
                     onClick={handleSelectAll}
                     className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
@@ -330,7 +330,7 @@ export default function StudentPortal() {
           /* Subject browser */
           <>
             <div className="mb-6">
-              <h1 className="text-2xl font-extrabold text-slate-800">
+              <h1 className="text-xl font-extrabold text-slate-800 sm:text-2xl">
                 Browse Study Materials
               </h1>
               <p className="text-sm text-slate-400">
