@@ -10,6 +10,7 @@ const appUrl =
 
 export const metadata: Metadata = {
   metadataBase: new URL(appUrl),
+  manifest: "/manifest.webmanifest",
   title: {
     default: "CourseDrop — Study Material Portal",
     template: "%s | CourseDrop",

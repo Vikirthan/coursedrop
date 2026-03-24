@@ -12,6 +12,7 @@ import {
   FiArrowRight,
 } from "react-icons/fi";
 import ThemeToggle from "@/components/ThemeToggle";
+import InstallAppButton from "@/components/InstallAppButton";
 
 export default function HomePage() {
   return (
@@ -50,6 +51,7 @@ export default function HomePage() {
             >
               Student Portal
             </Link>
+            <InstallAppButton />
             <div className="ml-1 border-l border-slate-200 pl-2 dark:border-slate-700 sm:ml-2">
               <ThemeToggle />
             </div>
