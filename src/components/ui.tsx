@@ -53,15 +53,19 @@ export function StatusChip({ status }: { status: string }) {
   const colors: Record<string, string> = {
     pending: "bg-amber-100 text-amber-800 border-amber-300",
     approved: "bg-emerald-100 text-emerald-800 border-emerald-300",
+    "approved-deleted": "bg-slate-100 text-slate-700 border-slate-300",
     rejected: "bg-red-100 text-red-800 border-red-300",
   };
+
+  const label = status === "approved-deleted" ? "Approved - Deleted" : status;
+
   return (
     <span
       className={`inline-block rounded-full border px-3 py-0.5 text-xs font-semibold capitalize ${
         colors[status] ?? "bg-slate-100 text-slate-600"
       }`}
     >
-      {status}
+      {label}
     </span>
   );
 }

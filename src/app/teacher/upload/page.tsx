@@ -61,6 +61,12 @@ function formatEta(seconds: number | null): string {
   return `About ${hours} hours`;
 }
 
+function toPercent(loaded: number, total: number): number {
+  if (total <= 0) return 0;
+  const raw = Math.round((loaded / total) * 100);
+  return Math.max(0, Math.min(raw, 100));
+}
+
 export default function TeacherUploadPage() {
   const { user } = useAuth();
   const [allApprovedRequests, setAllApprovedRequests] = useState<SubjectRequest[]>([]);
@@ -297,8 +303,7 @@ export default function TeacherUploadPage() {
           completedFiles: i,
           currentFileName: f.name,
           currentFileProgress: 0,
-          overallProgress:
-            totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 0,
+          overallProgress: toPercent(completedBytes, totalBytes),
           etaSeconds: prev?.etaSeconds ?? null,
         }));
 
@@ -316,7 +321,8 @@ export default function TeacherUploadPage() {
         }
 
         const data = await uploadFileWithProgress(formData, (loadedBytes) => {
-          const uploadedBytes = completedBytes + loadedBytes;
+          const cappedLoadedBytes = Math.min(Math.max(loadedBytes, 0), f.size);
+          const uploadedBytes = completedBytes + cappedLoadedBytes;
           const elapsedSeconds = Math.max((Date.now() - uploadStartedAt) / 1000, 0.1);
           const bytesPerSecond = uploadedBytes / elapsedSeconds;
           const remainingBytes = Math.max(totalBytes - uploadedBytes, 0);
@@ -327,10 +333,8 @@ export default function TeacherUploadPage() {
             totalFiles: fileList.length,
             completedFiles: i,
             currentFileName: f.name,
-            currentFileProgress:
-              f.size > 0 ? Math.round((loadedBytes / f.size) * 100) : 0,
-            overallProgress:
-              totalBytes > 0 ? Math.round((uploadedBytes / totalBytes) * 100) : 0,
+            currentFileProgress: toPercent(cappedLoadedBytes, f.size),
+            overallProgress: toPercent(uploadedBytes, totalBytes),
             etaSeconds,
           });
         });
@@ -353,8 +357,7 @@ export default function TeacherUploadPage() {
           completedFiles: i + 1,
           currentFileName: f.name,
           currentFileProgress: 100,
-          overallProgress:
-            totalBytes > 0 ? Math.round((completedBytes / totalBytes) * 100) : 100,
+          overallProgress: toPercent(completedBytes, totalBytes),
           etaSeconds:
             i + 1 === fileList.length
               ? 0

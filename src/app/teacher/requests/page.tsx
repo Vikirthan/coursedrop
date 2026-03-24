@@ -209,7 +209,13 @@ export default function TeacherRequestsPage() {
                   </p>
                 )}
               </div>
-              <StatusChip status={r.status} />
+              <StatusChip
+                status={
+                  r.status === "approved" && !(r.driveFolderId ?? "").trim()
+                    ? "approved-deleted"
+                    : r.status
+                }
+              />
             </div>
           ))}
         </div>

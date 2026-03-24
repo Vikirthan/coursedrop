@@ -16,7 +16,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ role }: LoginPageProps) {
-  const { login } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -29,6 +29,15 @@ export default function LoginPage({ role }: LoginPageProps) {
     setIsGithubPages(isGithubPagesRuntime());
   }, []);
 
+  useEffect(() => {
+    if (authLoading || !user) {
+      return;
+    }
+
+    const destination = user.role === "admin" ? "/admin" : user.role === "teacher" ? "/teacher" : "/";
+    router.replace(destination);
+  }, [authLoading, user, router]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -38,7 +47,7 @@ export default function LoginPage({ role }: LoginPageProps) {
       if (err) {
         setError(err);
       } else {
-        router.push(role === "admin" ? "/admin" : "/teacher");
+        router.replace(role === "admin" ? "/admin" : "/teacher");
       }
     } catch (err) {
       if (err instanceof Error) {
