@@ -16,7 +16,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ role }: LoginPageProps) {
-  const { login, user, loading: authLoading } = useAuth();
+  const { login, user, loading: authLoading, isInitialized } = useAuth();
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -30,13 +30,13 @@ export default function LoginPage({ role }: LoginPageProps) {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !user) {
+    if (!isInitialized || !user) {
       return;
     }
 
     const destination = user.role === "admin" ? "/admin" : user.role === "teacher" ? "/teacher" : "/";
     router.replace(destination);
-  }, [authLoading, user, router]);
+  }, [isInitialized, user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -16,6 +16,7 @@ interface AuthState {
   ) => Promise<string | null>; // returns error or null
   logout: () => void;
   loading: boolean;
+  isInitialized: boolean;
 }
 
 const AuthContext = createContext<AuthState>({
@@ -23,18 +24,21 @@ const AuthContext = createContext<AuthState>({
   login: async () => "Not ready",
   logout: () => {},
   loading: true,
+  isInitialized: false,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
-  // hydrate from localStorage
+  // hydrate from localStorage on mount only
   useEffect(() => {
     try {
       const stored = localStorage.getItem("coursedrop_user");
       if (stored) setUser(JSON.parse(stored));
     } catch { /* ignore */ }
+    setIsInitialized(true);
     setLoading(false);
   }, []);
 
@@ -110,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, logout, loading, isInitialized }}>
       {children}
     </AuthContext.Provider>
   );

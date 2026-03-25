@@ -11,6 +11,12 @@ type EmailRuntimeConfig = {
   appName: string;
 };
 
+type ResendErrorBody = {
+  statusCode?: number;
+  message?: string;
+  name?: string;
+};
+
 function getEmailRuntimeConfig(): EmailRuntimeConfig {
   const apiKey = (process.env.RESEND_API_KEY ?? "").trim();
   const fromEmail = (
@@ -131,9 +137,29 @@ export async function sendPasswordResetOtpEmail(
   });
 
   if (!res.ok) {
-    const body = await res.text();
+    const raw = await res.text();
+    let parsed: ResendErrorBody | null = null;
+
+    try {
+      parsed = JSON.parse(raw) as ResendErrorBody;
+    } catch {
+      parsed = null;
+    }
+
+    const providerMessage = (parsed?.message ?? raw).trim();
+
+    if (
+      res.status === 403 &&
+      providerMessage.toLowerCase().includes("domain") &&
+      providerMessage.toLowerCase().includes("not verified")
+    ) {
+      throw new Error(
+        "OTP email is blocked because the sender domain is not verified in Resend. Set RESEND_FROM_EMAIL to an address on a verified domain in Resend (or use onboarding@resend.dev for testing) and redeploy."
+      );
+    }
+
     throw new Error(
-      `Failed to send OTP email (${res.status} ${res.statusText}). ${body}`
+      `Failed to send OTP email (${res.status} ${res.statusText}). ${providerMessage}`
     );
   }
 }

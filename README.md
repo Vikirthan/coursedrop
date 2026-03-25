@@ -93,6 +93,7 @@ ADMIN_LOGIN_PASSWORD=
 Notes:
 - `ADMIN_LOGIN_ID` and `ADMIN_LOGIN_PASSWORD` are required for admin sign-in.
 - `ADMIN_DELETE_PASSWORD` is required for deleting full course folders from admin interface.
+- Resend requires a verified sender domain for production OTP emails. If you use a sender like `gmail.com`, OTP send will fail with 403. Set `RESEND_FROM_EMAIL` to an address on a verified domain in Resend. For testing only, you can use `onboarding@resend.dev`.
 
 ## Database Setup (Supabase)
 

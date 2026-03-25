@@ -16,16 +16,22 @@ import { FiSend, FiCheckCircle, FiFileText, FiClock } from "react-icons/fi";
 import { formatDate } from "@/lib/utils";
 
 export default function TeacherDashboard() {
-  const { user } = useAuth();
+  const { user, isInitialized } = useAuth();
   const [requests, setRequests] = useState<SubjectRequest[]>([]);
   const [fileCount, setFileCount] = useState(0);
   const [accessibleSubjectCount, setAccessibleSubjectCount] = useState(0);
 
   useEffect(() => {
-    if (!user) {
+    // Only clear data if initialized and there's no user (truly logged out)
+    if (isInitialized && !user) {
       setRequests([]);
       setFileCount(0);
       setAccessibleSubjectCount(0);
+      return;
+    }
+
+    // Don't run if not yet initialized or no user
+    if (!isInitialized || !user) {
       return;
     }
 

@@ -97,12 +97,20 @@ export async function POST(req: NextRequest) {
         throw otpErr;
       }
 
-      await sendPasswordResetOtpEmail({
-        toEmail: email,
-        recipientName: teacher.full_name,
-        otp,
-        expiresInMinutes: 10,
-      });
+      try {
+        await sendPasswordResetOtpEmail({
+          toEmail: email,
+          recipientName: teacher.full_name,
+          otp,
+          expiresInMinutes: 10,
+        });
+      } catch (mailErr) {
+        // Avoid leaving a valid OTP behind when email delivery fails.
+        await supabase.from("password_reset_otps").delete().eq("email", email);
+        throw new Error(
+          `Unable to send OTP email right now. ${getErrorMessage(mailErr)}`
+        );
+      }
 
       console.info(`[PASSWORD_RESET] OTP email sent to ${email}`);
 
