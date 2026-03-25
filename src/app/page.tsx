@@ -9,6 +9,7 @@ import {
   FiBookOpen,
   FiUploadCloud,
   FiUsers,
+  FiCheckCircle,
   FiArrowRight,
 } from "react-icons/fi";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -107,6 +108,11 @@ export default function HomePage() {
                 icon: <FiUsers size={28} />,
                 title: "Access Control",
                 desc: "Admins approve teacher access per subject. Students browse without logging in.",
+              },
+              {
+                icon: <FiCheckCircle size={28} />,
+                title: "Verified Materials",
+                desc: "Verified materials only for reference, uploaded by your teachers or incharges.",
               },
             ].map((f) => (
               <div
