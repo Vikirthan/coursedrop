@@ -11,6 +11,7 @@ import {
   FiUsers,
   FiCheckCircle,
   FiArrowRight,
+  FiAlertCircle,
 } from "react-icons/fi";
 import ThemeToggle from "@/components/ThemeToggle";
 import InstallAppButton from "@/components/InstallAppButton";
@@ -45,7 +46,7 @@ export default function HomePage() {
               href="/login/teacher"
               className="rounded-lg px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:px-4 sm:text-sm"
             >
-              Teacher Login
+              Teacher/CR Login
             </Link>
             <Link
               href="/student"
@@ -75,7 +76,7 @@ export default function HomePage() {
             </span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-slate-600 dark:text-slate-400 sm:text-lg">
-            CourseDrop lets teachers share lecture notes, slides, and lab manuals —
+            CourseDrop lets Teachers/CRs share lecture notes, slides, and lab manuals —
             and students can access them instantly, no login required.
           </p>
 
@@ -90,7 +91,7 @@ export default function HomePage() {
               href="/login/teacher"
               className="flex items-center gap-2 rounded-xl border border-slate-300 px-5 py-2.5 text-xs font-bold text-slate-700 transition-all duration-200 hover:bg-slate-100 active:scale-95 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-800 sm:px-7 sm:py-3 sm:text-sm"
             >
-              Teacher Portal
+              Teacher/CR Portal
             </Link>
           </div>
         </section>
@@ -102,17 +103,22 @@ export default function HomePage() {
               {
                 icon: <FiUploadCloud size={28} />,
                 title: "Easy Uploads",
-                desc: "Teachers can drag-and-drop PDFs, slides, images and text files into their approved subjects.",
+                desc: "Teachers/CRs can drag-and-drop PDFs, slides, images and text files into their approved subjects.",
               },
               {
                 icon: <FiUsers size={28} />,
                 title: "Access Control",
-                desc: "Admins approve teacher access per subject. Students browse without logging in.",
+                desc: "Admins approve Teacher/CR access per subject. Students browse without logging in.",
               },
               {
                 icon: <FiCheckCircle size={28} />,
                 title: "Verified Materials",
                 desc: "Verified materials only for reference, uploaded by your teachers or incharges.",
+              },
+              {
+                icon: <FiAlertCircle size={28} />,
+                title: "Reference Notice",
+                desc: "Materials shared here are for reference only and do not guarantee exact exam content. Always verify with official syllabus and faculty guidance.",
               },
             ].map((f) => (
               <div

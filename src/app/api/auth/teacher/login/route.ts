@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { compare } from "bcryptjs";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
+import {
+  createSessionToken,
+  getSessionCookieName,
+  getSessionMaxAgeSeconds,
+} from "@/lib/session";
+import { User } from "@/lib/types";
 
 type TeacherAccountRow = {
   id: string;
@@ -93,16 +99,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({
-      user: {
-        id: data.id,
-        username: data.uid,
-        name: data.full_name,
-        role: "teacher",
-        email: data.email,
-        department: data.department ?? undefined,
-      },
+    const user: User = {
+      id: data.id,
+      username: data.uid,
+      name: data.full_name,
+      role: "teacher",
+      email: data.email,
+      department: data.department ?? undefined,
+    };
+
+    const response = NextResponse.json({ user });
+    response.cookies.set({
+      name: getSessionCookieName(),
+      value: createSessionToken(user),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: getSessionMaxAgeSeconds(),
     });
+
+    return response;
   } catch (err: unknown) {
     console.error("[auth/teacher/login] Error:", err);
     const message = getErrorMessage(err);

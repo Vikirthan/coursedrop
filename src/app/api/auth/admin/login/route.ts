@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import {
+  createSessionToken,
+  getSessionCookieName,
+  getSessionMaxAgeSeconds,
+} from "@/lib/session";
+import { User } from "@/lib/types";
 
 interface AdminLoginPayload {
   identifier: string;
@@ -36,15 +42,26 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    return NextResponse.json({
-      user: {
-        id: "admin",
-        username: adminId,
-        name: "Admin",
-        role: "admin",
-        email: "admin@coursedrop.local",
-      },
+    const user: User = {
+      id: "admin",
+      username: adminId,
+      name: "Admin",
+      role: "admin",
+      email: "admin@coursedrop.local",
+    };
+
+    const response = NextResponse.json({ user });
+    response.cookies.set({
+      name: getSessionCookieName(),
+      value: createSessionToken(user),
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: getSessionMaxAgeSeconds(),
     });
+
+    return response;
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }

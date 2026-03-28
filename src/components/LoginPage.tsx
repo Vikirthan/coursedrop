@@ -86,13 +86,13 @@ export default function LoginPage({ role }: LoginPageProps) {
             <div
               className={`mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-2xl font-bold text-white shadow-lg ring-4 ring-offset-2 dark:ring-offset-slate-900 ring-indigo-100 dark:ring-slate-800 transition-transform duration-300 hover:scale-110`}
             >
-              {isAdmin ? "A" : "T"}
+              {isAdmin ? "A" : "TC"}
             </div>
             <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
-              {isAdmin ? "Admin Login" : "Teacher Login"}
+              {isAdmin ? "Admin Login" : "Teacher/CR Login"}
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">
-              {isAdmin ? "Manage courses and teachers" : "Access your course materials"}
+              {isAdmin ? "Manage courses and teachers" : "Access your course materials as Teacher/CR"}
             </p>
           </div>
 
@@ -101,7 +101,7 @@ export default function LoginPage({ role }: LoginPageProps) {
             <div className="mb-6 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3 flex gap-2">
               <FiAlertCircle className="mt-0.5 text-amber-600 dark:text-amber-400 flex-shrink-0" size={16} />
               <p className="text-xs text-amber-700 dark:text-amber-300">
-                Teacher login requires backend APIs. Not available on GitHub Pages. Use Vercel for full functionality.
+                Teacher/CR login requires backend APIs. Not available on GitHub Pages. Use Vercel for full functionality.
               </p>
             </div>
           )}
@@ -111,14 +111,14 @@ export default function LoginPage({ role }: LoginPageProps) {
             {/* UID input */}
             <div className="space-y-2">
               <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                {isAdmin ? "Admin ID" : "UID (Unique ID)"}
+                {isAdmin ? "Admin ID" : "UID (Teacher/CR Unique ID)"}
               </label>
               <div className="relative">
                 <input
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-slate-400 outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
-                  placeholder={isAdmin ? "Enter admin ID" : "Enter your UID"}
+                  placeholder={isAdmin ? "Enter admin ID" : "Enter your Teacher/CR UID"}
                   required
                   disabled={loading}
                 />
@@ -188,7 +188,7 @@ export default function LoginPage({ role }: LoginPageProps) {
                   href="/register/teacher"
                   className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline transition-colors"
                 >
-                  Create one
+                  Create Teacher/CR account
                 </Link>
               </p>
             )}

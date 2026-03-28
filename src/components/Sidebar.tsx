@@ -169,7 +169,9 @@ export default function Sidebar() {
           <FiHome /> Home
         </Link>
         <button
-          onClick={logout}
+          onClick={() => {
+            void logout();
+          }}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50"
         >
           <FiLogOut /> Sign out

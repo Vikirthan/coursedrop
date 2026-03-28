@@ -14,6 +14,7 @@ export default function TeacherRegisterPage() {
   const [uid, setUid] = useState("");
   const [contact, setContact] = useState("");
   const [email, setEmail] = useState("");
+  const [designation, setDesignation] = useState("");
   const [password, setPassword] = useState("");
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [department, setDepartment] = useState("");
@@ -30,7 +31,7 @@ export default function TeacherRegisterPage() {
 
     if (isGithubPagesRuntime()) {
       setError(
-        "Teacher registration needs backend APIs and is disabled on GitHub Pages. Deploy to Vercel for full functionality."
+        "Teacher/CR registration needs backend APIs and is disabled on GitHub Pages. Deploy to Vercel for full functionality."
       );
       return;
     }
@@ -53,6 +54,10 @@ export default function TeacherRegisterPage() {
     }
     if (!email.trim() || !email.includes("@")) {
       setError("Valid email is required");
+      return;
+    }
+    if (!designation) {
+      setError("Designation is required");
       return;
     }
     if (!validatePassword(password)) {
@@ -78,6 +83,7 @@ export default function TeacherRegisterPage() {
           uid,
           contact,
           email,
+          designation,
           password,
           department,
         }),
@@ -126,7 +132,7 @@ export default function TeacherRegisterPage() {
               Account Created!
             </h1>
             <p className="text-slate-600 dark:text-slate-400 mb-6">
-              Your teacher account has been created and is pending admin approval. 
+              Your Teacher/CR account has been created and is pending admin approval.
               Once approved, you'll be able to log in with your credentials.
             </p>
             <Link
@@ -182,7 +188,7 @@ export default function TeacherRegisterPage() {
               T
             </div>
             <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2">
-              Teacher Registration
+              Teacher/CR Registration
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400">
               Create your account and wait for admin approval
@@ -259,6 +265,26 @@ export default function TeacherRegisterPage() {
                 required
                 disabled={loading}
               />
+            </div>
+
+            {/* Designation */}
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
+                Designation *
+              </label>
+              <select
+                value={designation}
+                onChange={(e) => setDesignation(e.target.value)}
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 px-4 py-3 text-sm text-slate-900 dark:text-white outline-none transition-all duration-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 dark:focus:border-indigo-400 dark:focus:ring-indigo-400/20"
+                required
+                disabled={loading}
+              >
+                <option value="">Select designation</option>
+                <option value="Teacher">Teacher</option>
+                <option value="CR">Class Representative (CR)</option>
+                <option value="HOD">Head of Department (HOD)</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
 
             {/* Password */}

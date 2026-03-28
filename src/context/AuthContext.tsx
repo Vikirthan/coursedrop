@@ -14,7 +14,7 @@ interface AuthState {
     password: string,
     role: "admin" | "teacher"
   ) => Promise<string | null>; // returns error or null
-  logout: () => void;
+  logout: () => Promise<void>;
   loading: boolean;
   isInitialized: boolean;
 }
@@ -22,7 +22,7 @@ interface AuthState {
 const AuthContext = createContext<AuthState>({
   user: null,
   login: async () => "Not ready",
-  logout: () => {},
+  logout: async () => {},
   loading: true,
   isInitialized: false,
 });
@@ -32,14 +32,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
 
-  // hydrate from localStorage on mount only
+  // hydrate from server session cookie on mount only
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem("coursedrop_user");
-      if (stored) setUser(JSON.parse(stored));
-    } catch { /* ignore */ }
-    setIsInitialized(true);
-    setLoading(false);
+    const initialize = async () => {
+      try {
+        const res = await fetch("/api/auth/session", {
+          method: "GET",
+          cache: "no-store",
+        });
+
+        if (!res.ok) {
+          setUser(null);
+          return;
+        }
+
+        const data = (await res.json()) as { user?: User | null };
+        setUser(data.user ?? null);
+      } catch {
+        setUser(null);
+      } finally {
+        setIsInitialized(true);
+        setLoading(false);
+      }
+    };
+
+    void initialize();
   }, []);
 
   const login = async (
@@ -69,7 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         setUser(data.user);
-        localStorage.setItem("coursedrop_user", JSON.stringify(data.user));
         return null;
       } catch {
         return "Network error. Try again.";
@@ -77,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     if (isGithubPagesRuntime()) {
-      return "Teacher login needs backend APIs and is disabled on GitHub Pages. Deploy to Vercel for full login support.";
+      return "Teacher/CR login needs backend APIs and is disabled on GitHub Pages. Deploy to Vercel for full login support.";
     }
 
     try {
@@ -101,16 +117,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setUser(data.user);
-      localStorage.setItem("coursedrop_user", JSON.stringify(data.user));
       return null;
     } catch {
       return "Network error. Try again.";
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // best-effort logout; local state is still cleared below
+    }
     setUser(null);
-    localStorage.removeItem("coursedrop_user");
   };
 
   return (

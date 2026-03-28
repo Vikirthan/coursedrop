@@ -7,6 +7,7 @@ interface RegisterTeacherPayload {
   uid: string;
   contact: string;
   email: string;
+  designation: string;
   password: string;
   department?: string;
 }
@@ -61,12 +62,13 @@ export async function POST(req: NextRequest) {
     const uid = normalizeUid(body.uid ?? "");
     const contact = (body.contact ?? "").trim();
     const email = normalizeEmail(body.email ?? "");
+    const designation = (body.designation ?? "").trim();
     const password = body.password ?? "";
     const department = (body.department ?? "").trim();
 
-    if (!name || !uid || !contact || !email || !password) {
+    if (!name || !uid || !contact || !email || !designation || !password) {
       return NextResponse.json(
-        { error: "name, uid, contact, email, and password are required" },
+        { error: "name, uid, contact, email, designation, and password are required" },
         { status: 400 }
       );
     }
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hash(password, 10);
 
-    const { error: insertErr } = await supabase.from("teacher_accounts").insert({
+    const baseInsert = {
       full_name: name,
       uid,
       contact,
@@ -143,9 +145,50 @@ export async function POST(req: NextRequest) {
       department: department || null,
       password_hash: passwordHash,
       approved: false,
+    };
+
+    const { error: insertErr } = await supabase.from("teacher_accounts").insert({
+      ...baseInsert,
+      designation,
     });
 
     if (insertErr) {
+      // Backward-compatible fallback for older schemas that do not yet have a designation column.
+      if (insertErr.code === "42703") {
+        const fallbackDepartment = department
+          ? `${department} | ${designation}`
+          : designation;
+
+        const { error: fallbackErr } = await supabase
+          .from("teacher_accounts")
+          .insert({
+            ...baseInsert,
+            department: fallbackDepartment,
+          });
+
+        if (!fallbackErr) {
+          return NextResponse.json(
+            {
+              success: true,
+              message: "Account created. Wait for admin approval before login.",
+            },
+            { status: 201 }
+          );
+        }
+
+        if (fallbackErr.code === "42P01") {
+          return NextResponse.json(
+            {
+              error:
+                "Supabase table teacher_accounts is missing. Create it first in Supabase SQL editor.",
+            },
+            { status: 500 }
+          );
+        }
+
+        throw fallbackErr;
+      }
+
       if (insertErr.code === "42P01") {
         return NextResponse.json(
           {
