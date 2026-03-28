@@ -1,6 +1,7 @@
 import OpenGraphImage from "./opengraph-image";
 
 export const runtime = "edge";
+export const dynamic = "force-static";
 export const alt = "CourseDrop — Study Material Portal";
 export const contentType = "image/png";
 export const size = {
