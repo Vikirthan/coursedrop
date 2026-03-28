@@ -16,10 +16,13 @@ import {
 import ThemeToggle from "@/components/ThemeToggle";
 import InstallAppButton from "@/components/InstallAppButton";
 import ActiveUsersBadge from "@/components/ActiveUsersBadge";
+import InstallPromptModal from "@/components/InstallPromptModal";
 
 export default function HomePage() {
   return (
     <div className="relative min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 transition-colors duration-300">
+      <InstallPromptModal />
+
       {/* Decorative blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -right-40 top-0 h-80 w-80 bg-indigo-200 rounded-full mix-blend-multiply filter blur-3xl opacity-20 dark:opacity-10 animate-blob"></div>
@@ -29,7 +32,7 @@ export default function HomePage() {
 
       <div className="relative z-10">
         {/* ---- Navbar ---- */}
-        <nav className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 sm:py-5">
+        <nav className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-6 sm:py-5">
           <div className="flex items-center gap-2">
             <Image
               src="/icon.svg"
@@ -41,7 +44,7 @@ export default function HomePage() {
             />
             <span className="text-lg font-extrabold text-slate-900 dark:text-white sm:text-xl">CourseDrop</span>
           </div>
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:gap-3">
+          <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:w-auto sm:justify-end sm:gap-3">
             <Link
               href="/login/teacher"
               className="rounded-lg px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800 sm:px-4 sm:text-sm"
@@ -54,8 +57,10 @@ export default function HomePage() {
             >
               Student Portal
             </Link>
-            <InstallAppButton />
-            <div className="ml-1 border-l border-slate-200 pl-2 dark:border-slate-700 sm:ml-2">
+            <div className="w-full sm:w-auto">
+              <InstallAppButton />
+            </div>
+            <div className="ml-auto sm:ml-2 sm:border-l sm:border-slate-200 sm:pl-2 sm:dark:border-slate-700">
               <ThemeToggle />
             </div>
           </div>
@@ -98,7 +103,7 @@ export default function HomePage() {
 
         {/* ---- Features ---- */}
         <section className="mx-auto max-w-5xl px-4 pb-16 sm:px-6 sm:pb-24">
-          <div className="grid gap-6 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 icon: <FiUploadCloud size={28} />,
