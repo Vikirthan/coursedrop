@@ -1,7 +1,7 @@
 1:"$Sreact.fragment"
-2:I[96102,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/7793f75598456c50.js"],"ClientSegmentRoot"]
-3:I[50425,["/coursedrop/_next/static/chunks/89b87d1433fd4862.js","/coursedrop/_next/static/chunks/45e424b6a0e19c9c.js","/coursedrop/_next/static/chunks/1b5390f185744295.js"],"default"]
-4:I[71544,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/7793f75598456c50.js"],"default"]
-5:I[59203,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/7793f75598456c50.js"],"default"]
-0:{"buildId":"hq7paja3waXfL6CvVToMv","rsc":["$","$1","c",{"children":[[["$","script","script-0",{"src":"/coursedrop/_next/static/chunks/45e424b6a0e19c9c.js","async":true}],["$","script","script-1",{"src":"/coursedrop/_next/static/chunks/1b5390f185744295.js","async":true}]],["$","$L2",null,{"Component":"$3","slots":{"children":["$","$L4",null,{"parallelRouterKey":"children","template":["$","$L5",null,{}]}]},"serverProvidedParams":{"params":{},"promises":["$@6"]}}]]}],"loading":null,"isPartial":false}
+2:I[96102,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/682374def859ba49.js"],"ClientSegmentRoot"]
+3:I[50425,["/coursedrop/_next/static/chunks/7ac51d4e781ca52f.js","/coursedrop/_next/static/chunks/31a2f72191b176f7.js","/coursedrop/_next/static/chunks/2f82a9e8ee7a655b.js"],"default"]
+4:I[71544,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/682374def859ba49.js"],"default"]
+5:I[59203,["/coursedrop/_next/static/chunks/da982caf1b158e7f.js","/coursedrop/_next/static/chunks/682374def859ba49.js"],"default"]
+0:{"buildId":"H5QVd8vqMdxHu_X0e6At9","rsc":["$","$1","c",{"children":[[["$","script","script-0",{"src":"/coursedrop/_next/static/chunks/31a2f72191b176f7.js","async":true}],["$","script","script-1",{"src":"/coursedrop/_next/static/chunks/2f82a9e8ee7a655b.js","async":true}]],["$","$L2",null,{"Component":"$3","slots":{"children":["$","$L4",null,{"parallelRouterKey":"children","template":["$","$L5",null,{}]}]},"serverProvidedParams":{"params":{},"promises":["$@6"]}}]]}],"loading":null,"isPartial":false}
 6:"$0:rsc:props:children:1:props:serverProvidedParams:params"

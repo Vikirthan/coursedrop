@@ -1,0 +1,20 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="cd-bg" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="1" stop-color="#2563EB"/>
+    </linearGradient>
+    <linearGradient id="cd-plate" x1="128" y1="112" x2="384" y2="400" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.06"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#cd-bg)"/>
+  <rect x="96" y="96" width="320" height="320" rx="80" fill="url(#cd-plate)" stroke="#FFFFFF" stroke-opacity="0.2" stroke-width="2"/>
+
+  <path d="M145 210L256 156L367 210L256 264L145 210Z" fill="#FFFFFF"/>
+  <path d="M186 235V296C186 318 216 337 256 337C296 337 326 318 326 296V235L256 267L186 235Z" fill="#E0E7FF"/>
+
+  <rect x="198" y="355" width="116" height="16" rx="8" fill="#FFFFFF" fill-opacity="0.9"/>
+</svg>
