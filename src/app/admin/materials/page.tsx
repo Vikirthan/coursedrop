@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from "react";
 import {
+  apiAdminCreateFolder,
   apiDeleteFile,
   apiDeleteFilesByCourse,
   apiGetCourseSharing,
@@ -19,7 +20,7 @@ import { SectionHeader, EmptyState } from "@/components/ui";
 import FileCard from "@/components/FileCard";
 import ConfirmModal from "@/components/ConfirmModal";
 import PasswordModal from "@/components/PasswordModal";
-import { FiFileText, FiFolder, FiUsers, FiSave, FiLoader, FiTrash2 } from "react-icons/fi";
+import { FiFileText, FiFolder, FiUsers, FiSave, FiLoader, FiTrash2, FiPlus } from "react-icons/fi";
 import toast from "react-hot-toast";
 
 interface TeacherOption {
@@ -45,6 +46,15 @@ export default function AdminMaterialsPage() {
   const [showDeleteFolderModal, setShowDeleteFolderModal] = useState(false);
   const [deleteFolderLoading, setDeleteFolderLoading] = useState(false);
   const [deleteFolderError, setDeleteFolderError] = useState("");
+  
+  // Create folder form state
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createFormData, setCreateFormData] = useState({
+    courseCode: "",
+    subjectName: "",
+    department: "",
+  });
+  const [creatingFolder, setCreatingFolder] = useState(false);
 
   const refresh = async () => {
     try {
@@ -255,9 +265,124 @@ export default function AdminMaterialsPage() {
     }
   };
 
+  const handleCreateFolder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createFormData.courseCode.trim() || !createFormData.subjectName.trim() || !createFormData.department.trim()) {
+      toast.error("Please fill all fields");
+      return;
+    }
+
+    setCreatingFolder(true);
+    try {
+      await apiAdminCreateFolder({
+        courseCode: createFormData.courseCode.toUpperCase(),
+        subjectName: createFormData.subjectName,
+        department: createFormData.department,
+      });
+
+      toast.success(`Folder created for ${createFormData.courseCode}. Now use Sharing to assign teachers.`);
+      setCreateFormData({ courseCode: "", subjectName: "", department: "" });
+      setShowCreateForm(false);
+      await refresh();
+    } catch (err) {
+      console.error(err);
+      toast.error(err instanceof Error ? err.message : "Failed to create folder");
+    } finally {
+      setCreatingFolder(false);
+    }
+  };
+
   return (
     <div>
-      <SectionHeader title="All Study Materials" />
+      <SectionHeader
+        title="All Study Materials"
+        action={
+          <button
+            onClick={() => setShowCreateForm((prev) => !prev)}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+          >
+            <FiPlus />
+            {showCreateForm ? "Cancel" : "Create Folder"}
+          </button>
+        }
+      />
+
+      {/* Create folder form */}
+      {showCreateForm && (
+        <form onSubmit={handleCreateFolder} className="mb-6 rounded-2xl border border-indigo-200 bg-indigo-50/40 p-5 space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Course Code</label>
+              <input
+                type="text"
+                value={createFormData.courseCode}
+                onChange={(e) =>
+                  setCreateFormData((prev) => ({
+                    ...prev,
+                    courseCode: e.target.value,
+                  }))
+                }
+                placeholder="e.g. CS101"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                required
+                disabled={creatingFolder}
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Subject Name</label>
+              <input
+                type="text"
+                value={createFormData.subjectName}
+                onChange={(e) =>
+                  setCreateFormData((prev) => ({
+                    ...prev,
+                    subjectName: e.target.value,
+                  }))
+                }
+                placeholder="e.g. Data Structures"
+                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                required
+                disabled={creatingFolder}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Department</label>
+            <input
+              type="text"
+              value={createFormData.department}
+              onChange={(e) =>
+                setCreateFormData((prev) => ({
+                  ...prev,
+                  department: e.target.value,
+                }))
+              }
+              placeholder="e.g. Computer Science"
+              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              required
+              disabled={creatingFolder}
+            />
+          </div>
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateForm(false)}
+              className="flex-1 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              disabled={creatingFolder}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-60"
+              disabled={creatingFolder}
+            >
+              {creatingFolder ? <FiLoader className="animate-spin" /> : <FiPlus />}
+              Create Folder
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Subject list */}
       <div className="mb-6 flex flex-wrap gap-2">

@@ -234,3 +234,17 @@ export async function apiUpdateBugReport(
   const data = await parseJson<{ report: BugReport }>(res);
   return data.report;
 }
+
+export async function apiAdminCreateFolder(payload: {
+  courseCode: string;
+  subjectName: string;
+  department: string;
+}): Promise<SubjectRequest> {
+  const res = await fetch("/api/admin/create-folder", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const data = await parseJson<{ request: SubjectRequest }>(res);
+  return data.request;
+}
