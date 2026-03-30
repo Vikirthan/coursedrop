@@ -3,10 +3,16 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminRequest } from "@/lib/apiAuth";
 import { createSubjectFolder } from "@/lib/drive";
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAdminRequest(req);
+    if ("response" in auth) {
+      return auth.response;
+    }
+
     const { subjectName, courseCode } = await req.json();
 
     if (!subjectName || !courseCode) {

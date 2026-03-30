@@ -14,6 +14,7 @@ import {
   FiUploadCloud,
   FiSend,
   FiLogOut,
+  FiBookOpen,
   FiUsers,
   FiFileText,
   FiHome,
@@ -53,9 +54,6 @@ export default function Sidebar() {
 
   useEffect(() => {
     if (user?.role !== "admin") {
-      setPendingRequestCount(0);
-      setPendingTeacherCount(0);
-      setOpenBugCount(0);
       return;
     }
 
@@ -70,7 +68,7 @@ export default function Sidebar() {
         ]);
 
         const teacherPayload = (await teacherRes.json().catch(() => ({}))) as {
-          teachers?: Array<{ approved?: boolean }>;
+          teachers?: Array<{ approved?: boolean; approved_at?: string | null }>;
         };
         const bugPayload = (await bugRes.json().catch(() => ({}))) as {
           reports?: Array<{ status?: string }>;
@@ -80,7 +78,13 @@ export default function Sidebar() {
 
         if (!cancelled) {
           setPendingRequestCount(pendingRequests.length);
-          setPendingTeacherCount(teachers.filter((teacher) => !teacher.approved).length);
+          setPendingTeacherCount(
+            teachers.filter(
+              (teacher) =>
+                !teacher.approved &&
+                (!teacher.approved_at || teacher.approved_at.trim().length === 0)
+            ).length
+          );
           setOpenBugCount(reports.filter((report) => report.status !== "resolved").length);
         }
       } catch {
@@ -119,6 +123,10 @@ export default function Sidebar() {
     "/admin/requests": pendingRequestCount,
     "/admin/teachers": pendingTeacherCount,
     "/admin/bugs": openBugCount,
+  };
+
+  const handleOpenTutorial = () => {
+    window.dispatchEvent(new Event("coursedrop:open-teacher-tutorial"));
   };
 
   return (
@@ -168,6 +176,14 @@ export default function Sidebar() {
         >
           <FiHome /> Home
         </Link>
+        {user?.role === "teacher" && (
+          <button
+            onClick={handleOpenTutorial}
+            className="mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+          >
+            <FiBookOpen /> Tutorial
+          </button>
+        )}
         <button
           onClick={() => {
             void logout();

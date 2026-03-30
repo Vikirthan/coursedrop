@@ -3,6 +3,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminRequest } from "@/lib/apiAuth";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { createSubjectFolder } from "@/lib/drive";
 
@@ -14,6 +15,11 @@ interface CreateFolderPayload {
 
 export async function POST(req: NextRequest) {
   try {
+    const auth = requireAdminRequest(req);
+    if ("response" in auth) {
+      return auth.response;
+    }
+
     const body = (await req.json()) as Partial<CreateFolderPayload>;
     const courseCode = (body.courseCode ?? "").trim().toUpperCase();
     const subjectName = (body.subjectName ?? "").trim();

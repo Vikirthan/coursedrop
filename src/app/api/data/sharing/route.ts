@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminRequest } from "@/lib/apiAuth";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { CourseShareAccess } from "@/lib/types";
 
@@ -249,6 +250,11 @@ export async function GET(req: NextRequest) {
 
 export async function PUT(req: NextRequest) {
   try {
+    const auth = requireAdminRequest(req);
+    if ("response" in auth) {
+      return auth.response;
+    }
+
     const body = (await req.json()) as {
       courseCode?: string;
       teacherIds?: string[];

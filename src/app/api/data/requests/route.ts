@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { forbiddenJson, getSessionUserFromRequest, unauthorizedJson } from "@/lib/apiAuth";
+import { sendSubjectRequestStatusEmail } from "@/lib/email";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { RequestStatus, SubjectRequest } from "@/lib/types";
 
@@ -24,6 +26,15 @@ type RequestRow = {
   created_at: string;
   updated_at: string;
   drive_folder_id: string | null;
+};
+
+type RequestStatusNotificationRow = {
+  id: string;
+  status: RequestStatus;
+  teacher_email: string;
+  teacher_name: string;
+  subject_name: string;
+  course_code: string;
 };
 
 const VALID_STATUSES: RequestStatus[] = ["pending", "approved", "rejected"];
@@ -216,6 +227,11 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const sessionUser = getSessionUserFromRequest(req);
+    if (!sessionUser) {
+      return unauthorizedJson("Please sign in");
+    }
+
     const body = (await req.json()) as {
       id?: string;
       courseCode?: string;
@@ -229,6 +245,7 @@ export async function PATCH(req: NextRequest) {
     const updateData: Record<string, string | null> = {
       updated_at: new Date().toISOString(),
     };
+    const wantsStatusUpdate = typeof body.status === "string";
 
     if (typeof body.status === "string") {
       if (!isValidStatus(body.status)) {
@@ -238,6 +255,10 @@ export async function PATCH(req: NextRequest) {
         );
       }
       updateData.status = body.status;
+    }
+
+    if (wantsStatusUpdate && sessionUser.role !== "admin") {
+      return forbiddenJson("Only admin can update request status");
     }
 
     if (Object.prototype.hasOwnProperty.call(body, "driveFolderId")) {
@@ -255,6 +276,21 @@ export async function PATCH(req: NextRequest) {
     const supabase = getSupabaseAdminClient();
 
     if (id) {
+      let previousRow: RequestStatusNotificationRow | null = null;
+      if (wantsStatusUpdate) {
+        const previous = await supabase
+          .from("subject_requests")
+          .select("id,status,teacher_email,teacher_name,subject_name,course_code")
+          .eq("id", id)
+          .single();
+
+        if (previous.error) {
+          throw previous.error;
+        }
+
+        previousRow = previous.data as RequestStatusNotificationRow;
+      }
+
       const { data, error } = await supabase
         .from("subject_requests")
         .update(updateData)
@@ -264,6 +300,23 @@ export async function PATCH(req: NextRequest) {
 
       if (error) {
         throw error;
+      }
+
+      if (
+        wantsStatusUpdate &&
+        previousRow &&
+        previousRow.status !== data.status &&
+        (data.status === "approved" || data.status === "rejected")
+      ) {
+        void sendSubjectRequestStatusEmail({
+          toEmail: data.teacher_email,
+          recipientName: data.teacher_name,
+          subjectName: data.subject_name,
+          courseCode: data.course_code,
+          approved: data.status === "approved",
+        }).catch((mailErr) => {
+          console.error("[data/requests][PATCH] Failed to send status email:", mailErr);
+        });
       }
 
       return NextResponse.json(
@@ -299,6 +352,25 @@ export async function PATCH(req: NextRequest) {
       .filter((value) => value.length > 0);
 
     let data: RequestRow[] = [];
+    let previousRowsById = new Map<string, RequestStatusNotificationRow>();
+
+    if (wantsStatusUpdate && requestIds.length > 0) {
+      const previousRowsResult = await supabase
+        .from("subject_requests")
+        .select("id,status,teacher_email,teacher_name,subject_name,course_code")
+        .in("id", requestIds);
+
+      if (previousRowsResult.error) {
+        throw previousRowsResult.error;
+      }
+
+      previousRowsById = new Map(
+        ((previousRowsResult.data ?? []) as RequestStatusNotificationRow[]).map((row) => [
+          row.id,
+          row,
+        ])
+      );
+    }
 
     if (requestIds.length > 0) {
       const result = await supabase
@@ -312,6 +384,29 @@ export async function PATCH(req: NextRequest) {
       }
 
       data = (result.data ?? []) as RequestRow[];
+
+      if (wantsStatusUpdate) {
+        for (const row of data) {
+          const previous = previousRowsById.get(row.id);
+          if (!previous || previous.status === row.status) {
+            continue;
+          }
+
+          if (row.status !== "approved" && row.status !== "rejected") {
+            continue;
+          }
+
+          void sendSubjectRequestStatusEmail({
+            toEmail: row.teacher_email,
+            recipientName: row.teacher_name,
+            subjectName: row.subject_name,
+            courseCode: row.course_code,
+            approved: row.status === "approved",
+          }).catch((mailErr) => {
+            console.error("[data/requests][PATCH] Failed to send status email:", mailErr);
+          });
+        }
+      }
     }
 
     return NextResponse.json(

@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdminRequest } from "@/lib/apiAuth";
+import { sendTeacherApprovalStatusEmail } from "@/lib/email";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 
 interface ApprovePayload {
@@ -37,8 +39,13 @@ function getErrorMessage(err: unknown): string {
   return "Unknown error";
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const auth = requireAdminRequest(req);
+    if ("response" in auth) {
+      return auth.response;
+    }
+
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("teacher_accounts")
@@ -59,6 +66,11 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
+    const auth = requireAdminRequest(req);
+    if ("response" in auth) {
+      return auth.response;
+    }
+
     const body = (await req.json()) as Partial<ApprovePayload>;
     const id = body.id ?? body.teacher_id ?? "";
     const approved = Boolean(body.approved);
@@ -68,11 +80,23 @@ export async function PATCH(req: NextRequest) {
     }
 
     const supabase = getSupabaseAdminClient();
+    const { data: existingTeacher, error: existingTeacherError } = await supabase
+      .from("teacher_accounts")
+      .select("id,full_name,email,approved,approved_at")
+      .eq("id", id)
+      .single();
+
+    if (existingTeacherError) {
+      throw existingTeacherError;
+    }
+
     const { data, error } = await supabase
       .from("teacher_accounts")
       .update({
         approved,
-        approved_at: approved ? new Date().toISOString() : null,
+        approved_at: approved
+          ? new Date().toISOString()
+          : existingTeacher?.approved_at ?? null,
       })
       .eq("id", id)
       .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
@@ -80,6 +104,24 @@ export async function PATCH(req: NextRequest) {
 
     if (error) {
       throw error;
+    }
+
+    if (
+      existingTeacher &&
+      typeof existingTeacher.email === "string" &&
+      existingTeacher.email.trim() &&
+      existingTeacher.approved !== approved
+    ) {
+      void sendTeacherApprovalStatusEmail({
+        toEmail: existingTeacher.email,
+        recipientName:
+          typeof existingTeacher.full_name === "string"
+            ? existingTeacher.full_name
+            : null,
+        approved,
+      }).catch((mailErr) => {
+        console.error("[admin/teachers][PATCH] Email send failed:", mailErr);
+      });
     }
 
     return NextResponse.json({ teacher: data });

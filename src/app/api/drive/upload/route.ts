@@ -3,6 +3,7 @@
 // ============================================================
 
 import { NextRequest, NextResponse } from "next/server";
+import { forbiddenJson, getSessionUserFromRequest, unauthorizedJson } from "@/lib/apiAuth";
 import {
   createSubjectFolder,
   deleteFileFromDrive,
@@ -98,6 +99,80 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const sessionUser = getSessionUserFromRequest(req);
+    if (!sessionUser) {
+      return unauthorizedJson("Please sign in");
+    }
+
+    if (sessionUser.role !== "teacher" && sessionUser.role !== "admin") {
+      return forbiddenJson("Only teachers or admin can upload files");
+    }
+
+    const supabase = getSupabaseAdminClient();
+    const requesterTokens = new Set(
+      [
+        sessionUser.id,
+        sessionUser.username,
+        sessionUser.email,
+      ]
+        .map((value) => (value ?? "").trim().toLowerCase())
+        .filter((value) => value.length > 0)
+    );
+
+    const { data: approvedRows, error: approvedRowsError } = await supabase
+      .from("subject_requests")
+      .select("teacher_id,teacher_email")
+      .ilike("course_code", normalizedCourseCode)
+      .eq("status", "approved");
+
+    if (approvedRowsError) {
+      throw approvedRowsError;
+    }
+
+    const hasAdminOwnedApproval = (approvedRows ?? []).some((row) => {
+      const teacherId = String((row as { teacher_id?: unknown }).teacher_id ?? "")
+        .trim()
+        .toLowerCase();
+      return teacherId === "admin";
+    });
+
+    const ownsCourse = (approvedRows ?? []).some((row) => {
+      const teacherId = String((row as { teacher_id?: unknown }).teacher_id ?? "")
+        .trim()
+        .toLowerCase();
+      const teacherEmail = String((row as { teacher_email?: unknown }).teacher_email ?? "")
+        .trim()
+        .toLowerCase();
+      return requesterTokens.has(teacherId) || requesterTokens.has(teacherEmail);
+    });
+
+    let hasSharedAccess = false;
+    if (!ownsCourse && sessionUser.role === "teacher") {
+      const sharingResult = await supabase
+        .from("course_sharing")
+        .select("teacher_ids")
+        .ilike("course_code", normalizedCourseCode)
+        .maybeSingle();
+
+      if (sharingResult.error && sharingResult.error.code !== "PGRST116") {
+        throw sharingResult.error;
+      }
+
+      const teacherIds =
+        (sharingResult.data?.teacher_ids ?? [])
+          .map((value) => String(value).trim().toLowerCase())
+          .filter((value) => value.length > 0) ?? [];
+      hasSharedAccess = teacherIds.some((id) => requesterTokens.has(id));
+    }
+
+    if (sessionUser.role !== "admin" && !ownsCourse && !hasSharedAccess) {
+      return forbiddenJson("You do not have upload access for this course");
+    }
+
+    if (sessionUser.role === "teacher" && hasAdminOwnedApproval) {
+      return forbiddenJson("This folder is share-only. Upload is disabled by admin.");
+    }
+
     const resolvedSubjectName = subjectName?.trim() || normalizedCourseCode;
     let targetFolderId =
       folderId && folderId.trim().length > 0
@@ -145,7 +220,6 @@ export async function POST(req: NextRequest) {
       file.type.trim().toLowerCase() ||
       "file";
 
-    const supabase = getSupabaseAdminClient();
     const { data: existingRows, error: existingError } = await supabase
       .from("study_files")
       .select(FILE_SELECT_COLUMNS)

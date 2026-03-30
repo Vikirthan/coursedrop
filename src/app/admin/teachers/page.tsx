@@ -18,7 +18,11 @@ interface Teacher {
   department: string;
   approved: boolean;
   created_at: string;
-  approved_at?: string;
+  approved_at?: string | null;
+}
+
+function isPendingTeacher(teacher: Teacher): boolean {
+  return !teacher.approved && !(teacher.approved_at && teacher.approved_at.trim().length > 0);
 }
 
 export default function AdminTeachersPage() {
@@ -98,7 +102,7 @@ export default function AdminTeachersPage() {
     }
   };
 
-  const pendingTeachers = teachers.filter((t) => !t.approved);
+  const pendingTeachers = teachers.filter(isPendingTeacher);
   const approvedTeachers = teachers.filter((t) => t.approved);
   const displayTeachers =
     filter === "pending" ? pendingTeachers : approvedTeachers;

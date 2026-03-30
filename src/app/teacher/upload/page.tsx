@@ -72,6 +72,7 @@ export default function TeacherUploadPage() {
   const [allApprovedRequests, setAllApprovedRequests] = useState<SubjectRequest[]>([]);
   const [subjects, setSubjects] = useState<SubjectRequest[]>([]);
   const [ownedCourseCodes, setOwnedCourseCodes] = useState<string[]>([]);
+  const [shareOnlyCourseCodes, setShareOnlyCourseCodes] = useState<string[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [section, setSection] = useState("");
   const [files, setFiles] = useState<StudyFile[]>([]);
@@ -110,6 +111,15 @@ export default function TeacherUploadPage() {
       );
 
       setAllApprovedRequests(activeApprovedRequests);
+      setShareOnlyCourseCodes(
+        Array.from(
+          new Set(
+            activeApprovedRequests
+              .filter((request) => request.teacherId.trim().toLowerCase() === "admin")
+              .map((request) => request.courseCode)
+          )
+        )
+      );
 
       const ownedCourseSet = new Set<string>();
       const accessibleByCourse = new Map<string, SubjectRequest>();
@@ -266,6 +276,11 @@ export default function TeacherUploadPage() {
 
   const handleUpload = async (fileList: File[]) => {
     if (!selectedCourse || !user) return;
+
+    if (shareOnlyCourseCodes.includes(selectedCourse)) {
+      toast.error("This folder is share-only. Upload is disabled by admin.");
+      return;
+    }
 
     const normalizedSection = section.trim();
     const folderId = getFolderIdForCourse(selectedCourse);
@@ -523,6 +538,8 @@ export default function TeacherUploadPage() {
 
   const isOwnedSelectedCourse =
     !!selectedCourse && ownedCourseCodes.includes(selectedCourse);
+  const isShareOnlySelectedCourse =
+    !!selectedCourse && shareOnlyCourseCodes.includes(selectedCourse);
 
   return (
     <div>
@@ -545,7 +562,7 @@ export default function TeacherUploadPage() {
               <span className="max-w-[170px] truncate sm:max-w-[260px]">{s.subjectName} ({s.courseCode})</span>
               {!ownedCourseCodes.includes(s.courseCode) && (
                 <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
-                  Shared
+                  {shareOnlyCourseCodes.includes(s.courseCode) ? "View Only" : "Shared"}
                 </span>
               )}
             </button>
@@ -565,7 +582,9 @@ export default function TeacherUploadPage() {
 
       {selectedCourse && !isOwnedSelectedCourse && (
         <p className="mb-4 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-xs font-medium text-indigo-700">
-          Shared access: you can upload and view files for this subject, but folder deletion is restricted to the owner.
+          {isShareOnlySelectedCourse
+            ? "Shared access: this course is view-only. Upload is disabled by admin for this shared folder."
+            : "Shared access: you can upload and view files for this subject, but folder deletion is restricted to the owner."}
         </p>
       )}
 
@@ -577,57 +596,61 @@ export default function TeacherUploadPage() {
         />
       ) : (
         <>
-          <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <label className="mb-2 block text-sm font-semibold text-slate-700">
-              Section (optional, recommended)
-            </label>
-            <input
-              value={section}
-              onChange={(e) => setSection(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              placeholder="e.g. A, B, Morning Batch"
-            />
-            <p className="mt-2 text-xs text-slate-500">
-              Students will see this near files to avoid confusion across parallel sections.
-            </p>
-          </div>
-
-          {/* Upload zone */}
-          <div className="mb-6">
-            <UploadZone onFilesSelected={handleUpload} uploading={uploading} />
-
-            {uploading && uploadProgress && (
-              <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="mb-2 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                  <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-700">
-                    <FiLoader className="animate-spin text-indigo-500" />
-                    <span className="truncate">
-                      Uploading {Math.min(uploadProgress.completedFiles + 1, uploadProgress.totalFiles)}/
-                      {uploadProgress.totalFiles}: {uploadProgress.currentFileName}
-                    </span>
-                  </div>
-
-                  <button
-                    onClick={handleCancelUpload}
-                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
-                  >
-                    Cancel Upload
-                  </button>
-                </div>
-
-                <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className="h-full rounded-full bg-indigo-500 transition-all"
-                    style={{ width: `${Math.min(uploadProgress.overallProgress, 100)}%` }}
-                  />
-                </div>
-
+          {!isShareOnlySelectedCourse && (
+            <>
+              <div className="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
+                  Section (optional, recommended)
+                </label>
+                <input
+                  value={section}
+                  onChange={(e) => setSection(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                  placeholder="e.g. A, B, Morning Batch"
+                />
                 <p className="mt-2 text-xs text-slate-500">
-                  Overall {uploadProgress.overallProgress}% · Current file {uploadProgress.currentFileProgress}% · ETA {formatEta(uploadProgress.etaSeconds)}
+                  Students will see this near files to avoid confusion across parallel sections.
                 </p>
               </div>
-            )}
-          </div>
+
+              {/* Upload zone */}
+              <div className="mb-6">
+                <UploadZone onFilesSelected={handleUpload} uploading={uploading} />
+
+                {uploading && uploadProgress && (
+                  <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <div className="mb-2 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+                      <div className="flex min-w-0 items-center gap-2 text-sm font-semibold text-slate-700">
+                        <FiLoader className="animate-spin text-indigo-500" />
+                        <span className="truncate">
+                          Uploading {Math.min(uploadProgress.completedFiles + 1, uploadProgress.totalFiles)}/
+                          {uploadProgress.totalFiles}: {uploadProgress.currentFileName}
+                        </span>
+                      </div>
+
+                      <button
+                        onClick={handleCancelUpload}
+                        className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100"
+                      >
+                        Cancel Upload
+                      </button>
+                    </div>
+
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-indigo-500 transition-all"
+                        style={{ width: `${Math.min(uploadProgress.overallProgress, 100)}%` }}
+                      />
+                    </div>
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      Overall {uploadProgress.overallProgress}% · Current file {uploadProgress.currentFileProgress}% · ETA {formatEta(uploadProgress.etaSeconds)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
 
           {/* Existing files */}
           <SectionHeader title={`Files in ${selectedCourse}`} />

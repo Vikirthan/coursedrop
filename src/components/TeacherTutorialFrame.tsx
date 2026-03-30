@@ -3,11 +3,9 @@
 import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  FiBookOpen,
   FiCheckCircle,
   FiChevronRight,
   FiFolder,
-  FiHelpCircle,
   FiSend,
   FiTrash2,
   FiUploadCloud,
@@ -71,26 +69,6 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
 ];
 
-function TutorialChecklistView() {
-  return (
-    <ol className="space-y-4">
-      {TUTORIAL_STEPS.map((step, idx) => (
-        <li key={step.title} className="rounded-xl border border-slate-200 bg-white p-3">
-          <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 text-sm font-semibold">
-              {idx + 1}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-800">{step.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-slate-600">{step.description}</p>
-            </div>
-          </div>
-        </li>
-      ))}
-    </ol>
-  );
-}
-
 function StepByStepGuidedView({
   currentStep,
   onNext,
@@ -141,7 +119,7 @@ function StepByStepGuidedView({
           <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-4">
             <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Next Step</p>
             <p className="mt-2 text-sm text-indigo-900">
-              Click "Next" to go to the <strong>{step.title.toLowerCase()}</strong> page.
+              Click &quot;Next&quot; to go to the <strong>{step.title.toLowerCase()}</strong> page.
             </p>
           </div>
         </div>
@@ -173,7 +151,6 @@ export default function TeacherTutorialFrame({ userId, children }: TeacherTutori
   const router = useRouter();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [isFirstTime, setIsFirstTime] = useState(false);
 
   const storageKey = useMemo(
     () => `coursedrop.teacher.tutorial.seen.${userId}`,
@@ -187,9 +164,27 @@ export default function TeacherTutorialFrame({ userId, children }: TeacherTutori
     }
 
     window.localStorage.setItem(storageKey, "1");
-    setIsTutorialOpen(true);
-    setIsFirstTime(true);
+    const timerId = window.setTimeout(() => {
+      setIsTutorialOpen(true);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [storageKey]);
+
+  useEffect(() => {
+    const openFromSidebar = () => {
+      setCurrentStep(0);
+      setIsTutorialOpen(true);
+      router.push(TUTORIAL_STEPS[0].href);
+    };
+
+    window.addEventListener("coursedrop:open-teacher-tutorial", openFromSidebar);
+    return () => {
+      window.removeEventListener("coursedrop:open-teacher-tutorial", openFromSidebar);
+    };
+  }, [router]);
 
   const handleNext = () => {
     if (currentStep < TUTORIAL_STEPS.length - 1) {
@@ -216,54 +211,12 @@ export default function TeacherTutorialFrame({ userId, children }: TeacherTutori
     setIsTutorialOpen(false);
   };
 
-  const handleOpenTutorial = () => {
-    setCurrentStep(0);
-    setIsTutorialOpen(true);
-    router.push(TUTORIAL_STEPS[0].href);
-  };
-
   return (
     <>
       <div className="flex flex-1 overflow-hidden bg-slate-50">
         <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">
-          <div className="mb-4 lg:hidden">
-            <button
-              type="button"
-              onClick={handleOpenTutorial}
-              className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
-            >
-              <FiBookOpen />
-              Tutorial
-            </button>
-          </div>
           {children}
         </main>
-
-        <aside className="hidden w-80 shrink-0 border-l border-slate-200 bg-white lg:block">
-          <div className="sticky top-0 h-screen overflow-y-auto p-5">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
-                Teacher/CR Tutorial
-              </p>
-              <h3 className="mt-1 text-base font-bold text-slate-800">How CourseDrop works</h3>
-              <p className="mt-1 text-xs text-slate-600">
-                Keep this as a quick checklist while requesting, uploading, and managing folders.
-              </p>
-              <button
-                type="button"
-                onClick={handleOpenTutorial}
-                className="mt-3 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
-              >
-                <FiHelpCircle />
-                Start guided tour
-              </button>
-            </div>
-
-            <div className="mt-4">
-              <TutorialChecklistView />
-            </div>
-          </div>
-        </aside>
       </div>
 
       {isTutorialOpen && (

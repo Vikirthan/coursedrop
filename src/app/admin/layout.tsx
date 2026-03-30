@@ -1,29 +1,15 @@
-"use client";
 // ============================================================
 // CourseDrop — Admin Layout (with sidebar)
 // ============================================================
 
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
+import { getSessionUserFromCookies } from "@/lib/apiAuth";
+import { redirect } from "next/navigation";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) {
-      router.replace("/login/admin");
-    }
-  }, [user, loading, router]);
-
-  if (loading || !user || user.role !== "admin") {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-4 text-center text-slate-400">
-        Loading…
-      </div>
-    );
+export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  const user = await getSessionUserFromCookies();
+  if (!user || user.role !== "admin") {
+    redirect("/login/admin");
   }
 
   return (
