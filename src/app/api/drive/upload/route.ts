@@ -158,10 +158,10 @@ export async function POST(req: NextRequest) {
         throw sharingResult.error;
       }
 
-      const teacherIds =
+      const teacherIds: string[] =
         (sharingResult.data?.teacher_ids ?? [])
-          .map((value) => String(value).trim().toLowerCase())
-          .filter((value) => value.length > 0) ?? [];
+          .map((value: unknown) => String(value).trim().toLowerCase())
+          .filter((value: string) => value.length > 0) ?? [];
       hasSharedAccess = teacherIds.some((id) => requesterTokens.has(id));
     }
 
