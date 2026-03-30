@@ -1,10 +1,11 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import React, { useEffect, useMemo, useState } from "react";
 import {
   FiBookOpen,
   FiCheckCircle,
+  FiChevronRight,
   FiFolder,
   FiHelpCircle,
   FiSend,
@@ -70,28 +71,18 @@ const TUTORIAL_STEPS: TutorialStep[] = [
   },
 ];
 
-function TutorialList({ compact = false }: { compact?: boolean }) {
+function TutorialChecklistView() {
   return (
-    <ol className={compact ? "space-y-3" : "space-y-4"}>
+    <ol className="space-y-4">
       {TUTORIAL_STEPS.map((step, idx) => (
         <li key={step.title} className="rounded-xl border border-slate-200 bg-white p-3">
           <div className="flex items-start gap-3">
-            <span className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-indigo-700">
-              {step.icon}
+            <span className="mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-indigo-50 text-indigo-700 text-sm font-semibold">
+              {idx + 1}
             </span>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-slate-800">
-                {idx + 1}. {step.title}
-              </p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-800">{step.title}</p>
               <p className="mt-1 text-xs leading-relaxed text-slate-600">{step.description}</p>
-              {!compact && (
-                <Link
-                  href={step.href}
-                  className="mt-2 inline-block text-xs font-semibold text-indigo-700 hover:text-indigo-800"
-                >
-                  Open this page
-                </Link>
-              )}
             </div>
           </div>
         </li>
@@ -100,8 +91,89 @@ function TutorialList({ compact = false }: { compact?: boolean }) {
   );
 }
 
+function StepByStepGuidedView({
+  currentStep,
+  onNext,
+  onPrev,
+  onClose,
+}: {
+  currentStep: number;
+  onNext: () => void;
+  onPrev: () => void;
+  onClose: () => void;
+}) {
+  const step = TUTORIAL_STEPS[currentStep];
+  if (!step) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/30 p-4 sm:items-center">
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="sticky top-0 border-b border-slate-200 bg-gradient-to-r from-indigo-50 to-blue-50 px-6 py-4 flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+              Step {currentStep + 1} of {TUTORIAL_STEPS.length}
+            </p>
+            <p className="mt-1 text-sm text-slate-400">
+              Progress: {((currentStep + 1) / TUTORIAL_STEPS.length * 100).toFixed(0)}%
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
+            aria-label="Close tutorial"
+          >
+            <FiX />
+          </button>
+        </div>
+
+        <div className="space-y-6 px-6 py-6">
+          <div className="flex items-start gap-4">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 text-xl">
+              {step.icon}
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-slate-900">{step.title}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">{step.description}</p>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-4">
+            <p className="text-xs font-semibold text-indigo-700 uppercase tracking-wide">Next Step</p>
+            <p className="mt-2 text-sm text-indigo-900">
+              Click "Next" to go to the <strong>{step.title.toLowerCase()}</strong> page.
+            </p>
+          </div>
+        </div>
+
+        <div className="sticky bottom-0 border-t border-slate-200 bg-slate-50 px-6 py-4 flex gap-3">
+          <button
+            type="button"
+            onClick={onPrev}
+            disabled={currentStep === 0}
+            className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={onNext}
+            className="flex-1 rounded-lg bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:shadow-lg transition-all flex items-center justify-center gap-2"
+          >
+            {currentStep === TUTORIAL_STEPS.length - 1 ? "Done" : "Next"}
+            {currentStep !== TUTORIAL_STEPS.length - 1 && <FiChevronRight />}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TeacherTutorialFrame({ userId, children }: TeacherTutorialFrameProps) {
+  const router = useRouter();
   const [isTutorialOpen, setIsTutorialOpen] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isFirstTime, setIsFirstTime] = useState(false);
 
   const storageKey = useMemo(
     () => `coursedrop.teacher.tutorial.seen.${userId}`,
@@ -116,7 +188,39 @@ export default function TeacherTutorialFrame({ userId, children }: TeacherTutori
 
     window.localStorage.setItem(storageKey, "1");
     setIsTutorialOpen(true);
+    setIsFirstTime(true);
   }, [storageKey]);
+
+  const handleNext = () => {
+    if (currentStep < TUTORIAL_STEPS.length - 1) {
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      // Navigate to the next step's page
+      router.push(TUTORIAL_STEPS[nextStep].href);
+    } else {
+      // Tutorial finished
+      setIsTutorialOpen(false);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentStep > 0) {
+      const prevStep = currentStep - 1;
+      setCurrentStep(prevStep);
+      // Navigate to the previous step's page
+      router.push(TUTORIAL_STEPS[prevStep].href);
+    }
+  };
+
+  const handleClose = () => {
+    setIsTutorialOpen(false);
+  };
+
+  const handleOpenTutorial = () => {
+    setCurrentStep(0);
+    setIsTutorialOpen(true);
+    router.push(TUTORIAL_STEPS[0].href);
+  };
 
   return (
     <>
@@ -125,7 +229,7 @@ export default function TeacherTutorialFrame({ userId, children }: TeacherTutori
           <div className="mb-4 lg:hidden">
             <button
               type="button"
-              onClick={() => setIsTutorialOpen(true)}
+              onClick={handleOpenTutorial}
               className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 hover:bg-indigo-100"
             >
               <FiBookOpen />
@@ -138,62 +242,37 @@ export default function TeacherTutorialFrame({ userId, children }: TeacherTutori
         <aside className="hidden w-80 shrink-0 border-l border-slate-200 bg-white lg:block">
           <div className="sticky top-0 h-screen overflow-y-auto p-5">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Teacher/CR Tutorial</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">
+                Teacher/CR Tutorial
+              </p>
               <h3 className="mt-1 text-base font-bold text-slate-800">How CourseDrop works</h3>
               <p className="mt-1 text-xs text-slate-600">
                 Keep this as a quick checklist while requesting, uploading, and managing folders.
               </p>
               <button
                 type="button"
-                onClick={() => setIsTutorialOpen(true)}
+                onClick={handleOpenTutorial}
                 className="mt-3 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-indigo-700"
               >
                 <FiHelpCircle />
-                Open full tutorial
+                Start guided tour
               </button>
             </div>
 
             <div className="mt-4">
-              <TutorialList compact />
+              <TutorialChecklistView />
             </div>
           </div>
         </aside>
       </div>
 
       {isTutorialOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-slate-50 p-5 shadow-2xl sm:p-6">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-indigo-700">Welcome to CourseDrop</p>
-                <h2 className="text-xl font-bold text-slate-900">Teacher/CR Quick Tutorial</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Follow these steps to request access, upload files, and safely manage folders.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setIsTutorialOpen(false)}
-                className="rounded-lg p-2 text-slate-500 hover:bg-slate-200 hover:text-slate-800"
-                aria-label="Close tutorial"
-              >
-                <FiX />
-              </button>
-            </div>
-
-            <TutorialList />
-
-            <div className="mt-5 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsTutorialOpen(false)}
-                className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
-              >
-                Got it
-              </button>
-            </div>
-          </div>
-        </div>
+        <StepByStepGuidedView
+          currentStep={currentStep}
+          onNext={handleNext}
+          onPrev={handlePrev}
+          onClose={handleClose}
+        />
       )}
     </>
   );
