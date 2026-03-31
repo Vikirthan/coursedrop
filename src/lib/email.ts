@@ -19,6 +19,15 @@ type SubjectRequestStatusEmailInput = {
   approved: boolean;
 };
 
+type CourseSharingNotificationEmailInput = {
+  toEmail: string;
+  recipientName?: string | null;
+  courseCode: string;
+  ownerName?: string | null;
+  sharedWithName?: string | null;
+  audience: "owner" | "recipient";
+};
+
 type EmailRuntimeConfig = {
   apiKey: string;
   fromEmail: string;
@@ -329,6 +338,78 @@ function buildSubjectRequestStatusText(params: {
   ].join("\n");
 }
 
+function buildCourseSharingNotificationHtml(params: {
+  appName: string;
+  appUrl: string;
+  recipientName?: string | null;
+  courseCode: string;
+  ownerName?: string | null;
+  sharedWithName?: string | null;
+  audience: "owner" | "recipient";
+}): string {
+  const greeting = params.recipientName?.trim()
+    ? `Hello ${escapeHtml(params.recipientName.trim())},`
+    : "Hello,";
+
+  const title =
+    params.audience === "owner"
+      ? "Course Folder Sharing Update"
+      : "New Course Folder Sharing Access";
+
+  const ownerText = params.ownerName?.trim()
+    ? escapeHtml(params.ownerName.trim())
+    : "the folder owner";
+  const recipientText = params.sharedWithName?.trim()
+    ? escapeHtml(params.sharedWithName.trim())
+    : "a teacher";
+
+  const body =
+    params.audience === "owner"
+      ? `Sharing access for course <strong>${escapeHtml(params.courseCode)}</strong> has been granted to <strong>${recipientText}</strong>.`
+      : `You have been granted sharing access to the course folder <strong>${escapeHtml(params.courseCode)}</strong>, owned by <strong>${ownerText}</strong>.`;
+
+  return buildEmailShell({
+    appName: params.appName,
+    appUrl: params.appUrl,
+    title,
+    bodyHtml: `
+      <p style="margin: 0 0 12px;">${greeting}</p>
+      <p style="margin: 0;">${body}</p>
+    `,
+  });
+}
+
+function buildCourseSharingNotificationText(params: {
+  appName: string;
+  recipientName?: string | null;
+  courseCode: string;
+  ownerName?: string | null;
+  sharedWithName?: string | null;
+  audience: "owner" | "recipient";
+}): string {
+  const greeting = params.recipientName?.trim()
+    ? `Hello ${params.recipientName.trim()},`
+    : "Hello,";
+
+  const ownerText = params.ownerName?.trim() || "the folder owner";
+  const recipientText = params.sharedWithName?.trim() || "a teacher";
+
+  const detail =
+    params.audience === "owner"
+      ? `Sharing access for course ${params.courseCode} has been granted to ${recipientText}.`
+      : `You have been granted sharing access to course ${params.courseCode}, owned by ${ownerText}.`;
+
+  return [
+    `${params.appName} Sharing Notification`,
+    "",
+    greeting,
+    "",
+    detail,
+    "",
+    "Please sign in to CourseDrop for details.",
+  ].join("\n");
+}
+
 export async function sendTeacherApprovalStatusEmail(
   input: TeacherApprovalStatusEmailInput
 ): Promise<void> {
@@ -406,5 +487,52 @@ export async function sendSubjectRequestStatusEmail(
   if (!res.ok) {
     const raw = await res.text();
     throw new Error(`Failed to send request status email (${res.status}): ${raw}`);
+  }
+}
+
+export async function sendCourseSharingNotificationEmail(
+  input: CourseSharingNotificationEmailInput
+): Promise<void> {
+  const config = getEmailRuntimeConfig();
+
+  const payload = {
+    from: config.fromEmail,
+    to: [input.toEmail],
+    subject:
+      input.audience === "owner"
+        ? `${config.appName} sharing granted (${input.courseCode})`
+        : `${config.appName} folder access granted (${input.courseCode})`,
+    html: buildCourseSharingNotificationHtml({
+      appName: config.appName,
+      appUrl: config.appUrl,
+      recipientName: input.recipientName,
+      courseCode: input.courseCode,
+      ownerName: input.ownerName,
+      sharedWithName: input.sharedWithName,
+      audience: input.audience,
+    }),
+    text: buildCourseSharingNotificationText({
+      appName: config.appName,
+      recipientName: input.recipientName,
+      courseCode: input.courseCode,
+      ownerName: input.ownerName,
+      sharedWithName: input.sharedWithName,
+      audience: input.audience,
+    }),
+  };
+
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const raw = await res.text();
+    throw new Error(`Failed to send sharing notification email (${res.status}): ${raw}`);
   }
 }

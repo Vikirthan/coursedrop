@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdminRequest } from "@/lib/apiAuth";
+import { sendCourseSharingNotificationEmail } from "@/lib/email";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { CourseShareAccess } from "@/lib/types";
 
@@ -22,6 +23,12 @@ type TeacherAccountRow = {
   id: string;
   uid: string | null;
   email: string | null;
+  full_name?: string | null;
+};
+
+type SubjectOwnerRow = {
+  teacher_id: string | null;
+  teacher_name: string | null;
 };
 
 function getErrorMessage(err: unknown): string {
@@ -104,6 +111,34 @@ async function getTeacherIdentityMap(): Promise<Map<string, string>> {
   }
 
   return buildTeacherIdentityMap((data ?? []) as TeacherAccountRow[]);
+}
+
+async function getTeacherAccountsByIds(
+  teacherIds: string[]
+): Promise<Map<string, TeacherAccountRow>> {
+  const ids = dedupe(teacherIds.map((id) => id.trim()).filter(Boolean));
+  if (ids.length === 0) {
+    return new Map<string, TeacherAccountRow>();
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("teacher_accounts")
+    .select("id,uid,email,full_name")
+    .in("id", ids);
+
+  if (error) {
+    throw error;
+  }
+
+  const map = new Map<string, TeacherAccountRow>();
+  for (const row of (data ?? []) as TeacherAccountRow[]) {
+    if (!row.id) {
+      continue;
+    }
+    map.set(row.id, row);
+  }
+  return map;
 }
 
 function resolveTeacherIds(
@@ -275,6 +310,24 @@ export async function PUT(req: NextRequest) {
     const supabase = getSupabaseAdminClient();
     const teacherIdentityMap = await getTeacherIdentityMap();
 
+    const { data: existingShareRow, error: existingShareError } = await supabase
+      .from("course_sharing")
+      .select("teacher_ids")
+      .ilike("course_code", courseCode)
+      .maybeSingle();
+
+    if (existingShareError) {
+      throw existingShareError;
+    }
+
+    const previousTeacherIds = resolveTeacherIds(
+      ((existingShareRow as { teacher_ids?: string[] | null } | null)?.teacher_ids ?? []).filter(
+        (id): id is string => typeof id === "string"
+      ),
+      teacherIdentityMap,
+      false
+    );
+
     const normalizedTeacherIds = resolveTeacherIds(
       requestedTeacherIds,
       teacherIdentityMap,
@@ -302,6 +355,9 @@ export async function PUT(req: NextRequest) {
     );
 
     const teacherIds = normalizedTeacherIds.filter((id) => !ownerTeacherIds.has(id));
+    const newlyAddedTeacherIds = teacherIds.filter(
+      (id) => !previousTeacherIds.includes(id)
+    );
 
     if (teacherIds.length === 0) {
       const { error } = await supabase
@@ -333,6 +389,86 @@ export async function PUT(req: NextRequest) {
 
     if (error) {
       throw error;
+    }
+
+    if (newlyAddedTeacherIds.length > 0) {
+      const [subjectOwnerRowsResult, recipientAccounts] = await Promise.all([
+        supabase
+          .from("subject_requests")
+          .select("teacher_id,teacher_name")
+          .ilike("course_code", courseCode)
+          .eq("status", "approved")
+          .order("updated_at", { ascending: false })
+          .limit(1),
+        getTeacherAccountsByIds(newlyAddedTeacherIds),
+      ]);
+
+      if (subjectOwnerRowsResult.error) {
+        throw subjectOwnerRowsResult.error;
+      }
+
+      const ownerRow =
+        ((subjectOwnerRowsResult.data ?? [])[0] as SubjectOwnerRow | undefined) ?? null;
+
+      const ownerCanonicalId = ownerRow?.teacher_id
+        ? resolveTeacherIds([ownerRow.teacher_id], teacherIdentityMap, false)[0]
+        : undefined;
+      const ownerAccountMap = ownerCanonicalId
+        ? await getTeacherAccountsByIds([ownerCanonicalId])
+        : new Map<string, TeacherAccountRow>();
+      const ownerAccount = ownerCanonicalId
+        ? ownerAccountMap.get(ownerCanonicalId) ?? null
+        : null;
+
+      const ownerName =
+        ownerAccount?.full_name?.trim() || ownerRow?.teacher_name?.trim() || null;
+
+      const notificationJobs: Promise<void>[] = [];
+
+      for (const recipientId of newlyAddedTeacherIds) {
+        const recipient = recipientAccounts.get(recipientId);
+        const recipientEmail = recipient?.email?.trim() ?? "";
+        const recipientName = recipient?.full_name?.trim() ?? null;
+
+        if (ownerAccount?.email?.trim()) {
+          notificationJobs.push(
+            sendCourseSharingNotificationEmail({
+              toEmail: ownerAccount.email.trim(),
+              recipientName: ownerName,
+              courseCode,
+              ownerName,
+              sharedWithName: recipientName,
+              audience: "owner",
+            })
+          );
+        }
+
+        if (recipientEmail) {
+          notificationJobs.push(
+            sendCourseSharingNotificationEmail({
+              toEmail: recipientEmail,
+              recipientName: recipientName,
+              courseCode,
+              ownerName,
+              sharedWithName: recipientName,
+              audience: "recipient",
+            })
+          );
+        }
+      }
+
+      if (notificationJobs.length > 0) {
+        void Promise.allSettled(notificationJobs).then((results) => {
+          results.forEach((result, index) => {
+            if (result.status === "rejected") {
+              console.error(
+                `[data/sharing][PUT] Sharing notification ${index + 1} failed:`,
+                result.reason
+              );
+            }
+          });
+        });
+      }
     }
 
     return NextResponse.json(
