@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ClientProviders from "./providers";
+import { Analytics } from "@vercel/analytics/next";
 
 const appUrl =
   process.env.NEXT_PUBLIC_APP_URL?.trim() ||
@@ -67,6 +68,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="dark:bg-slate-950">
         <ClientProviders>{children}</ClientProviders>
+        <Analytics />
       </body>
     </html>
   );
