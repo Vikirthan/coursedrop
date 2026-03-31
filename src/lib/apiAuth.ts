@@ -1,6 +1,10 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import { getSessionCookieName, verifySessionToken } from "@/lib/session";
+import {
+  getSessionCookieClearConfig,
+  getSessionCookieName,
+  verifySessionToken,
+} from "@/lib/session";
 import { User, UserRole } from "@/lib/types";
 
 type AuthResult =
@@ -8,12 +12,7 @@ type AuthResult =
   | { user?: never; response: NextResponse };
 
 function clearSessionCookie(response: NextResponse): void {
-  response.cookies.set({
-    name: getSessionCookieName(),
-    value: "",
-    path: "/",
-    maxAge: 0,
-  });
+  response.cookies.set(getSessionCookieClearConfig());
 }
 
 export async function getSessionUserFromCookies(): Promise<User | null> {

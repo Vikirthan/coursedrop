@@ -11,6 +11,7 @@ export interface User {
   role: UserRole;
   email: string;
   department?: string;
+  designation?: string;
 }
 
 export type RequestStatus = "pending" | "approved" | "rejected";

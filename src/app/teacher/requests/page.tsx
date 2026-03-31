@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiCreateRequest, apiListRequests } from "@/lib/clientDataApi";
 import { SubjectRequest } from "@/lib/types";
 import { SectionHeader, StatusChip, EmptyState } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
+import { formatDate, formatTeacherDisplayName } from "@/lib/utils";
 import { FiSend, FiInbox, FiPlus } from "react-icons/fi";
 import toast from "react-hot-toast";
 
@@ -83,7 +83,7 @@ export default function TeacherRequestsPage() {
     try {
       await apiCreateRequest({
         teacherId: user.id,
-        teacherName: user.name,
+        teacherName: formatTeacherDisplayName(user.name, user.designation),
         teacherEmail: user.email,
         subjectName,
         courseCode: courseCode.toUpperCase(),

@@ -14,7 +14,7 @@ interface AuthState {
     password: string,
     role: "admin" | "teacher"
   ) => Promise<string | null>; // returns error or null
-  logout: () => Promise<void>;
+  logout: () => Promise<string | null>; // returns error or null
   loading: boolean;
   isInitialized: boolean;
 }
@@ -22,7 +22,7 @@ interface AuthState {
 const AuthContext = createContext<AuthState>({
   user: null,
   login: async () => "Not ready",
-  logout: async () => {},
+  logout: async () => "Not ready",
   loading: true,
   isInitialized: false,
 });
@@ -38,7 +38,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch("/api/auth/session", {
           method: "GET",
+          credentials: "include",
           cache: "no-store",
+          headers: {
+            "Cache-Control": "no-store",
+            Pragma: "no-cache",
+          },
         });
 
         if (!res.ok) {
@@ -72,6 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const res = await fetch("/api/auth/admin/login", {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ identifier, password }),
         });
@@ -99,6 +105,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch("/api/auth/teacher/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ identifier, password }),
       });
@@ -123,13 +130,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = async () => {
+  const logout = async (): Promise<string | null> => {
+    let requestError = false;
+
     try {
-      await fetch("/api/auth/logout", { method: "POST" });
+      const res = await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+          Pragma: "no-cache",
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("Logout failed");
+      }
     } catch {
-      // best-effort logout; local state is still cleared below
+      requestError = true;
     }
-    setUser(null);
+
+    try {
+      const verifyRes = await fetch(`/api/auth/session?_ts=${Date.now()}`, {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+        headers: {
+          "Cache-Control": "no-store",
+          Pragma: "no-cache",
+        },
+      });
+
+      if (!verifyRes.ok) {
+        setUser(null);
+        return null;
+      }
+
+      const verifyData = (await verifyRes.json()) as { user?: User | null };
+      if (!verifyData.user) {
+        setUser(null);
+        return null;
+      }
+
+      setUser(verifyData.user);
+      return "Sign out failed: session cookie is still active. Please try again.";
+    } catch {
+      if (!requestError) {
+        setUser(null);
+        return null;
+      }
+
+      return "Network issue while signing out. Please check connection and retry.";
+    }
   };
 
   return (

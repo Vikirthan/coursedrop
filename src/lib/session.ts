@@ -93,3 +93,49 @@ export function getSessionCookieName(): string {
 export function getSessionMaxAgeSeconds(): number {
   return SESSION_TTL_SECONDS;
 }
+
+function isProduction(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
+export function getSessionCookieConfig(token: string): {
+  name: string;
+  value: string;
+  httpOnly: true;
+  secure: boolean;
+  sameSite: "lax";
+  path: "/";
+  maxAge: number;
+} {
+  return {
+    name: getSessionCookieName(),
+    value: token,
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: getSessionMaxAgeSeconds(),
+  };
+}
+
+export function getSessionCookieClearConfig(): {
+  name: string;
+  value: string;
+  httpOnly: true;
+  secure: boolean;
+  sameSite: "lax";
+  path: "/";
+  maxAge: 0;
+  expires: Date;
+} {
+  return {
+    name: getSessionCookieName(),
+    value: "",
+    httpOnly: true,
+    secure: isProduction(),
+    sameSite: "lax",
+    path: "/",
+    maxAge: 0,
+    expires: new Date(0),
+  };
+}

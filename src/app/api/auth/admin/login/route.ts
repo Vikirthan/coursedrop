@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   createSessionToken,
-  getSessionCookieName,
-  getSessionMaxAgeSeconds,
+  getSessionCookieConfig,
 } from "@/lib/session";
 import { User } from "@/lib/types";
 
@@ -51,15 +50,7 @@ export async function POST(req: NextRequest) {
     };
 
     const response = NextResponse.json({ user });
-    response.cookies.set({
-      name: getSessionCookieName(),
-      value: createSessionToken(user),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: getSessionMaxAgeSeconds(),
-    });
+    response.cookies.set(getSessionCookieConfig(createSessionToken(user)));
 
     return response;
   } catch {

@@ -1,30 +1,16 @@
-"use client";
 // ============================================================
 // CourseDrop — Teacher Layout (with sidebar + auth guard)
 // ============================================================
 
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
-import { useEffect } from "react";
 import Sidebar from "@/components/Sidebar";
 import TeacherTutorialFrame from "@/components/TeacherTutorialFrame";
+import { getSessionUserFromCookies } from "@/lib/apiAuth";
+import { redirect } from "next/navigation";
 
-export default function TeacherLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!loading && (!user || user.role !== "teacher")) {
-      router.replace("/login/teacher");
-    }
-  }, [user, loading, router]);
-
-  if (loading || !user || user.role !== "teacher") {
-    return (
-      <div className="flex min-h-screen items-center justify-center px-4 text-center text-slate-400">
-        Loading…
-      </div>
-    );
+export default async function TeacherLayout({ children }: { children: React.ReactNode }) {
+  const user = await getSessionUserFromCookies();
+  if (!user || user.role !== "teacher") {
+    redirect("/login/teacher");
   }
 
   return (

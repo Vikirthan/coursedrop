@@ -57,10 +57,33 @@ function getMasterParentId(): string {
 
 function mapDriveError(err: unknown): Error {
   const message = err instanceof Error ? err.message : "Unknown Google Drive error";
+  const serialized = (() => {
+    try {
+      return JSON.stringify(err);
+    } catch {
+      return "";
+    }
+  })();
+
+  if (/invalid_grant/i.test(message) || /invalid_grant/i.test(serialized)) {
+    return new Error(
+      "Google Drive authentication failed (invalid_grant). Your OAuth refresh token is expired/revoked or mismatched to the OAuth client. Recreate GOOGLE_OAUTH_REFRESH_TOKEN for the same GOOGLE_OAUTH_CLIENT_ID and GOOGLE_OAUTH_CLIENT_SECRET, then redeploy."
+    );
+  }
 
   if (/unauthorized_client/i.test(message)) {
     return new Error(
       "unauthorized_client: Domain-wide delegation works only on Google Workspace. For personal Gmail, clear GOOGLE_DRIVE_DELEGATED_USER_EMAIL and use OAuth env vars (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_REFRESH_TOKEN)."
+    );
+  }
+
+  if (
+    /insufficient permissions|insufficient authentication scopes|access denied|forbidden|not have permission|permission/i.test(
+      message
+    )
+  ) {
+    return new Error(
+      "Google Drive access denied for folder operations. Ensure the authenticated account has Editor access to the parent folder (GOOGLE_DRIVE_MASTER_FOLDER_ID) or Shared Drive, and that Drive API is enabled for the OAuth project."
     );
   }
 

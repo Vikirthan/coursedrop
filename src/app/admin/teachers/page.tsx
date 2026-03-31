@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { FiCheckCircle, FiXCircle, FiRefreshCw, FiArrowLeft } from "react-icons/fi";
+import { formatTeacherDisplayName, inferDesignationFromDepartment } from "@/lib/utils";
 
 interface Teacher {
   id: string;
@@ -16,6 +17,7 @@ interface Teacher {
   contact: string;
   email: string;
   department: string;
+  designation?: string | null;
   approved: boolean;
   created_at: string;
   approved_at?: string | null;
@@ -195,7 +197,10 @@ export default function AdminTeachersPage() {
                 <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-start">
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-slate-800">
-                      {teacher.full_name}
+                      {formatTeacherDisplayName(
+                        teacher.full_name,
+                        teacher.designation ?? inferDesignationFromDepartment(teacher.department)
+                      )}
                     </h3>
                     <div className="mt-2 grid grid-cols-1 gap-3 text-sm text-slate-600 sm:grid-cols-2">
                       <div>

@@ -3,10 +3,10 @@ import { compare } from "bcryptjs";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import {
   createSessionToken,
-  getSessionCookieName,
-  getSessionMaxAgeSeconds,
+  getSessionCookieConfig,
 } from "@/lib/session";
 import { User } from "@/lib/types";
+import { inferDesignationFromDepartment, normalizeDesignation } from "@/lib/utils";
 
 type TeacherAccountRow = {
   id: string;
@@ -15,6 +15,7 @@ type TeacherAccountRow = {
   contact: string;
   email: string;
   department: string | null;
+  designation?: string | null;
   password_hash: string;
   approved: boolean;
 };
@@ -26,6 +27,10 @@ interface TeacherLoginPayload {
 
 function isNoRowsError(code?: string): boolean {
   return code === "PGRST116";
+}
+
+function isMissingColumnError(code?: string): boolean {
+  return code === "42703";
 }
 
 function getErrorMessage(err: unknown): string {
@@ -73,11 +78,25 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabaseAdminClient();
 
-    const { data, error } = await supabase
+    const primary = await supabase
       .from("teacher_accounts")
-      .select("id,full_name,uid,contact,email,department,password_hash,approved")
+      .select("id,full_name,uid,contact,email,department,designation,password_hash,approved")
       .eq("uid", identifier)
       .maybeSingle<TeacherAccountRow>();
+
+    let data = primary.data;
+    let error = primary.error;
+
+    if (error && isMissingColumnError(error.code)) {
+      const fallback = await supabase
+        .from("teacher_accounts")
+        .select("id,full_name,uid,contact,email,department,password_hash,approved")
+        .eq("uid", identifier)
+        .maybeSingle<TeacherAccountRow>();
+
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error && !isNoRowsError(error.code)) {
       throw error;
@@ -106,18 +125,14 @@ export async function POST(req: NextRequest) {
       role: "teacher",
       email: data.email,
       department: data.department ?? undefined,
+      designation:
+        normalizeDesignation(data.designation) ||
+        inferDesignationFromDepartment(data.department) ||
+        undefined,
     };
 
     const response = NextResponse.json({ user });
-    response.cookies.set({
-      name: getSessionCookieName(),
-      value: createSessionToken(user),
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      path: "/",
-      maxAge: getSessionMaxAgeSeconds(),
-    });
+    response.cookies.set(getSessionCookieConfig(createSessionToken(user)));
 
     return response;
   } catch (err: unknown) {

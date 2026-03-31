@@ -34,9 +34,13 @@ export default function LoginPage({ role }: LoginPageProps) {
       return;
     }
 
-    const destination = user.role === "admin" ? "/admin" : user.role === "teacher" ? "/teacher" : "/";
-    router.replace(destination);
-  }, [isInitialized, user, router]);
+    // Only auto-redirect when the signed-in user matches this page role.
+    if (user.role !== role) {
+      return;
+    }
+
+    router.replace(role === "admin" ? "/admin" : "/teacher");
+  }, [isInitialized, user, role, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

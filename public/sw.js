@@ -1,4 +1,4 @@
-const CACHE_NAME = "coursedrop-v2";
+const CACHE_NAME = "coursedrop-v3";
 const STATIC_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -6,7 +6,28 @@ const STATIC_ASSETS = [
   "/icon-512.png",
   "/icon-maskable-512.png",
   "/apple-touch-icon.png",
+  "/icon.svg",
 ];
+
+function isCacheableStaticRequest(request, url) {
+  if (request.mode === "navigate") {
+    return false;
+  }
+
+  if (url.pathname.startsWith("/api/")) {
+    return false;
+  }
+
+  if (request.cache === "no-store") {
+    return false;
+  }
+
+  if (STATIC_ASSETS.includes(url.pathname)) {
+    return true;
+  }
+
+  return /\.(?:png|jpe?g|gif|webp|svg|ico|css|js|woff2?|ttf)$/i.test(url.pathname);
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -31,6 +52,10 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  if (!isCacheableStaticRequest(event.request, url)) {
     return;
   }
 

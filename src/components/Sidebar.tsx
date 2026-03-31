@@ -6,9 +6,10 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { apiListRequests } from "@/lib/clientDataApi";
+import toast from "react-hot-toast";
 import {
   FiGrid,
   FiUploadCloud,
@@ -47,10 +48,12 @@ const teacherNav: NavItem[] = [
 export default function Sidebar() {
   const { user, logout } = useAuth();
   const pathname = usePathname();
+  const router = useRouter();
   const nav = user?.role === "admin" ? adminNav : teacherNav;
   const [pendingRequestCount, setPendingRequestCount] = useState(0);
   const [pendingTeacherCount, setPendingTeacherCount] = useState(0);
   const [openBugCount, setOpenBugCount] = useState(0);
+  const [isSigningOut, setIsSigningOut] = useState(false);
 
   useEffect(() => {
     if (user?.role !== "admin") {
@@ -129,6 +132,35 @@ export default function Sidebar() {
     window.dispatchEvent(new Event("coursedrop:open-teacher-tutorial"));
   };
 
+  const handleSignOut = async () => {
+    if (isSigningOut) {
+      return;
+    }
+
+    setIsSigningOut(true);
+    const role = user?.role;
+
+    try {
+      const error = await logout();
+      if (error) {
+        toast.error(error);
+        return;
+      }
+
+      const destination =
+        role === "admin"
+          ? "/login/admin"
+          : role === "teacher"
+          ? "/login/teacher"
+          : "/";
+
+      router.replace(destination);
+      router.refresh();
+    } finally {
+      setIsSigningOut(false);
+    }
+  };
+
   return (
     <aside className="flex w-full shrink-0 flex-col border-b border-slate-200 bg-white md:h-screen md:w-64 md:border-b-0 md:border-r">
       {/* brand */}
@@ -186,11 +218,12 @@ export default function Sidebar() {
         )}
         <button
           onClick={() => {
-            void logout();
+            void handleSignOut();
           }}
+          disabled={isSigningOut}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-500 hover:bg-red-50"
         >
-          <FiLogOut /> Sign out
+          <FiLogOut /> {isSigningOut ? "Signing out..." : "Sign out"}
         </button>
         {user && (
           <p className="mt-2 truncate px-3 text-xs text-slate-400">

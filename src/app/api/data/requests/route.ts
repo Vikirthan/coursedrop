@@ -3,6 +3,11 @@ import { forbiddenJson, getSessionUserFromRequest, unauthorizedJson } from "@/li
 import { sendSubjectRequestStatusEmail } from "@/lib/email";
 import { getSupabaseAdminClient } from "@/lib/supabaseServer";
 import { RequestStatus, SubjectRequest } from "@/lib/types";
+import {
+  formatTeacherDisplayName,
+  inferDesignationFromDepartment,
+  normalizeDesignation,
+} from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -37,6 +42,14 @@ type RequestStatusNotificationRow = {
   course_code: string;
 };
 
+type TeacherAccountLookupRow = {
+  id: string;
+  uid: string;
+  email: string;
+  department: string | null;
+  designation?: string | null;
+};
+
 const VALID_STATUSES: RequestStatus[] = ["pending", "approved", "rejected"];
 
 function getErrorMessage(err: unknown): string {
@@ -67,6 +80,49 @@ function getErrorMessage(err: unknown): string {
   }
 
   return "Unknown error";
+}
+
+function isMissingColumnError(code?: string): boolean {
+  return code === "42703";
+}
+
+async function resolveTeacherDisplayName(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  teacherId: string;
+  teacherEmail: string;
+  fallbackName: string;
+}): Promise<string> {
+  const { supabase, teacherId, teacherEmail, fallbackName } = params;
+
+  const lookupWithDesignation = await supabase
+    .from("teacher_accounts")
+    .select("id,uid,email,department,designation")
+    .or(`id.eq.${teacherId},uid.eq.${teacherId},email.eq.${teacherEmail}`)
+    .maybeSingle<TeacherAccountLookupRow>();
+
+  let data = lookupWithDesignation.data;
+  let error = lookupWithDesignation.error;
+
+  if (error && isMissingColumnError(error.code)) {
+    const fallbackLookup = await supabase
+      .from("teacher_accounts")
+      .select("id,uid,email,department")
+      .or(`id.eq.${teacherId},uid.eq.${teacherId},email.eq.${teacherEmail}`)
+      .maybeSingle<TeacherAccountLookupRow>();
+
+    data = fallbackLookup.data;
+    error = fallbackLookup.error;
+  }
+
+  if (error || !data) {
+    return fallbackName;
+  }
+
+  const designation =
+    normalizeDesignation(data.designation) ||
+    inferDesignationFromDepartment(data.department);
+
+  return formatTeacherDisplayName(fallbackName, designation);
 }
 
 function toSubjectRequest(row: RequestRow): SubjectRequest {
@@ -185,11 +241,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const supabase = getSupabaseAdminClient();
+    const teacherDisplayName = await resolveTeacherDisplayName({
+      supabase,
+      teacherId,
+      teacherEmail,
+      fallbackName: teacherName,
+    });
+
     const now = new Date().toISOString();
     const row: RequestRow = {
       id: body.id?.trim() || `req-${crypto.randomUUID()}`,
       teacher_id: teacherId,
-      teacher_name: teacherName,
+      teacher_name: teacherDisplayName,
       teacher_email: teacherEmail,
       department,
       subject_name: subjectName,
@@ -201,7 +265,6 @@ export async function POST(req: NextRequest) {
       drive_folder_id: null,
     };
 
-    const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from("subject_requests")
       .insert(row)

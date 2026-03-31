@@ -9,6 +9,10 @@ interface ApprovePayload {
   approved: boolean;
 }
 
+function isMissingColumnError(code?: string): boolean {
+  return code === "42703";
+}
+
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error && err.message.trim()) {
     return err.message;
@@ -47,10 +51,22 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
+    const primary = await supabase
       .from("teacher_accounts")
-      .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
+      .select("id,full_name,uid,contact,email,department,designation,approved,created_at,approved_at")
       .order("created_at", { ascending: false });
+
+    let data = primary.data;
+    let error = primary.error;
+
+    if (error && isMissingColumnError(error.code)) {
+      const fallback = await supabase
+        .from("teacher_accounts")
+        .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
+        .order("created_at", { ascending: false });
+      data = fallback.data;
+      error = fallback.error;
+    }
 
     if (error) {
       throw error;
@@ -90,7 +106,7 @@ export async function PATCH(req: NextRequest) {
       throw existingTeacherError;
     }
 
-    const { data, error } = await supabase
+    const primaryUpdate = await supabase
       .from("teacher_accounts")
       .update({
         approved,
@@ -99,8 +115,28 @@ export async function PATCH(req: NextRequest) {
           : existingTeacher?.approved_at ?? null,
       })
       .eq("id", id)
-      .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
+      .select("id,full_name,uid,contact,email,department,designation,approved,created_at,approved_at")
       .single();
+
+    let data = primaryUpdate.data;
+    let error = primaryUpdate.error;
+
+    if (error && isMissingColumnError(error.code)) {
+      const fallbackUpdate = await supabase
+        .from("teacher_accounts")
+        .update({
+          approved,
+          approved_at: approved
+            ? new Date().toISOString()
+            : existingTeacher?.approved_at ?? null,
+        })
+        .eq("id", id)
+        .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
+        .single();
+
+      data = fallbackUpdate.data;
+      error = fallbackUpdate.error;
+    }
 
     if (error) {
       throw error;

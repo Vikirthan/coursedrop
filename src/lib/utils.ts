@@ -26,6 +26,41 @@ export function uid(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
+export function normalizeDesignation(value?: string | null): string {
+  return (value ?? "").trim();
+}
+
+export function isCrDesignation(value?: string | null): boolean {
+  return normalizeDesignation(value).toUpperCase() === "CR";
+}
+
+export function inferDesignationFromDepartment(department?: string | null): string {
+  const raw = (department ?? "").trim();
+  if (!raw.includes("|")) {
+    return "";
+  }
+
+  const parts = raw.split("|");
+  return normalizeDesignation(parts[parts.length - 1] ?? "");
+}
+
+export function formatTeacherDisplayName(name: string, designation?: string | null): string {
+  const cleanName = name.trim();
+  if (!cleanName) {
+    return cleanName;
+  }
+
+  if (/\(\s*CR\s*\)$/i.test(cleanName)) {
+    return cleanName;
+  }
+
+  if (isCrDesignation(designation)) {
+    return `${cleanName} (CR)`;
+  }
+
+  return cleanName;
+}
+
 export const ALLOWED_EXTENSIONS = [
   "pdf",
   "ppt",
