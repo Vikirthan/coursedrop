@@ -9,6 +9,19 @@ interface ApprovePayload {
   approved: boolean;
 }
 
+type TeacherAccountResponseRow = {
+  id: string;
+  full_name: string;
+  uid: string;
+  contact: string;
+  email: string;
+  department: string | null;
+  designation?: string | null;
+  approved: boolean;
+  created_at: string;
+  approved_at: string | null;
+};
+
 function isMissingColumnError(code?: string): boolean {
   return code === "42703";
 }
@@ -56,7 +69,7 @@ export async function GET(req: NextRequest) {
       .select("id,full_name,uid,contact,email,department,designation,approved,created_at,approved_at")
       .order("created_at", { ascending: false });
 
-    let data = primary.data;
+    let data = (primary.data ?? null) as TeacherAccountResponseRow[] | null;
     let error = primary.error;
 
     if (error && isMissingColumnError(error.code)) {
@@ -64,7 +77,7 @@ export async function GET(req: NextRequest) {
         .from("teacher_accounts")
         .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
         .order("created_at", { ascending: false });
-      data = fallback.data;
+      data = (fallback.data ?? null) as TeacherAccountResponseRow[] | null;
       error = fallback.error;
     }
 
@@ -118,7 +131,7 @@ export async function PATCH(req: NextRequest) {
       .select("id,full_name,uid,contact,email,department,designation,approved,created_at,approved_at")
       .single();
 
-    let data = primaryUpdate.data;
+    let data = (primaryUpdate.data ?? null) as TeacherAccountResponseRow | null;
     let error = primaryUpdate.error;
 
     if (error && isMissingColumnError(error.code)) {
@@ -134,7 +147,7 @@ export async function PATCH(req: NextRequest) {
         .select("id,full_name,uid,contact,email,department,approved,created_at,approved_at")
         .single();
 
-      data = fallbackUpdate.data;
+      data = (fallbackUpdate.data ?? null) as TeacherAccountResponseRow | null;
       error = fallbackUpdate.error;
     }
 
