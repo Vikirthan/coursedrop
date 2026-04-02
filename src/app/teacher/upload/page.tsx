@@ -77,6 +77,22 @@ function getFileSignature(name: string, size: number): string {
   return `${name.trim().toLowerCase()}::${size}`;
 }
 
+function getDuplicateFileIds(items: StudyFile[]): string[] {
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+
+  for (const item of items) {
+    const signature = getFileSignature(item.name, item.size);
+    if (seen.has(signature)) {
+      duplicates.push(item.id);
+      continue;
+    }
+    seen.add(signature);
+  }
+
+  return duplicates;
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
@@ -103,6 +119,7 @@ export default function TeacherUploadPage() {
   const [shareOnlyCourseCodes, setShareOnlyCourseCodes] = useState<string[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [section, setSection] = useState("");
+  const [allFiles, setAllFiles] = useState<StudyFile[]>([]);
   const [files, setFiles] = useState<StudyFile[]>([]);
   const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
@@ -136,6 +153,7 @@ export default function TeacherUploadPage() {
         apiListRequests({ status: "approved" }),
         apiGetTeacherSharedCourses(user.id, user.username, user.email),
       ]);
+      const nextAllFiles = await apiListFiles(undefined, { syncFromDrive: false });
 
       const activeApprovedRequests = approvedRequests.filter(
         (request) => (request.driveFolderId ?? "").trim().length > 0
@@ -180,6 +198,7 @@ export default function TeacherUploadPage() {
       const accessibleSubjects = Array.from(accessibleByCourse.values());
       setOwnedCourseCodes(Array.from(ownedCourseSet));
       setSubjects(accessibleSubjects);
+      setAllFiles(nextAllFiles);
 
       if (selectedCourse) {
         const stillAccessible = accessibleSubjects.some(
@@ -317,7 +336,10 @@ export default function TeacherUploadPage() {
     activeUploadXhrRef.current?.abort();
   };
 
-  const handleUpload = async (fileList: File[]) => {
+  const processUploads = async (
+    fileList: File[],
+    options?: { skipClientDuplicateFilter?: boolean }
+  ) => {
     if (!selectedCourse || !user || uploading) return;
 
     if (shareOnlyCourseCodes.includes(selectedCourse)) {
@@ -328,9 +350,9 @@ export default function TeacherUploadPage() {
     const normalizedSection = section.trim();
     const folderId = getFolderIdForCourse(selectedCourse);
 
-    const existingSignatures = new Set(
-      files.map((file) => getFileSignature(file.name, file.size))
-    );
+    const existingSignatures = options?.skipClientDuplicateFilter
+      ? new Set<string>()
+      : new Set(files.map((file) => getFileSignature(file.name, file.size)));
     const queuedSignatures = new Set<string>();
     const duplicateNames: string[] = [];
     const uploadQueue: File[] = [];
@@ -412,6 +434,9 @@ export default function TeacherUploadPage() {
         formData.append("subjectName", currentSubject?.subjectName ?? selectedCourse);
         if (normalizedSection) {
           formData.append("section", normalizedSection);
+        }
+        if (options?.skipClientDuplicateFilter) {
+          formData.append("overwrite", "1");
         }
 
         let data: UploadApiResponse | null = null;
@@ -561,11 +586,18 @@ export default function TeacherUploadPage() {
     await refresh(false, true);
   };
 
+  const handleUpload = (fileList: File[]) => {
+    void processUploads(fileList);
+  };
+
   const handleRetryFailed = () => {
     if (failedUploads.length === 0 || uploading) {
       return;
     }
-    void handleUpload(failedUploads.map((entry) => entry.file));
+    void processUploads(
+      failedUploads.map((entry) => entry.file),
+      { skipClientDuplicateFilter: true }
+    );
   };
 
   const handleDownload = (file: StudyFile) => {
@@ -602,6 +634,20 @@ export default function TeacherUploadPage() {
     setSelectedFileIds(new Set(deletableIds));
   };
 
+  const deleteFileEntry = async (file: StudyFile): Promise<void> => {
+    if (file.driveFileId) {
+      const res = await fetch(`/api/drive/delete?fileId=${file.driveFileId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Delete failed");
+      }
+    }
+
+    await apiDeleteFile(file.id);
+  };
+
   const handleDelete = async () => {
     if (!deleteTarget) return;
     setDeleting(true);
@@ -621,18 +667,7 @@ export default function TeacherUploadPage() {
 
     try {
       // Delete from Google Drive
-      if (file && file.driveFileId) {
-        const res = await fetch(`/api/drive/delete?fileId=${file.driveFileId}`, {
-          method: "DELETE",
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error || "Delete failed");
-        }
-      }
-
-      // Delete from local store
-      await apiDeleteFile(deleteTarget);
+      await deleteFileEntry(file);
       toast.success("File deleted from Drive");
       setDeleteTarget(null);
       setSelectedFileIds((prev) => {
@@ -670,17 +705,7 @@ export default function TeacherUploadPage() {
 
     for (const file of deletableFiles) {
       try {
-        if (file.driveFileId) {
-          const res = await fetch(`/api/drive/delete?fileId=${file.driveFileId}`, {
-            method: "DELETE",
-          });
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}));
-            throw new Error(err.error || "Delete failed");
-          }
-        }
-
-        await apiDeleteFile(file.id);
+        await deleteFileEntry(file);
         deletedCount++;
       } catch {
         failedNames.push(file.name);
@@ -701,6 +726,60 @@ export default function TeacherUploadPage() {
     setShowBatchDeleteConfirm(false);
     setDeleting(false);
     await refresh(false, true);
+  };
+
+  const handleRemoveDuplicates = async () => {
+    if (!user || deleting || uploading) {
+      return;
+    }
+
+    const duplicateIds = getDuplicateFileIds(files);
+    if (duplicateIds.length === 0) {
+      toast.success("No duplicates found");
+      return;
+    }
+
+    const duplicateFiles = files.filter((file) => duplicateIds.includes(file.id));
+    const deletableDuplicates = duplicateFiles.filter(
+      (file) => file.uploadedBy === user.id || ownedCourseCodes.includes(file.courseCode)
+    );
+    const blockedDuplicates = duplicateFiles.filter(
+      (file) => !(file.uploadedBy === user.id || ownedCourseCodes.includes(file.courseCode))
+    );
+
+    setDeleting(true);
+    let removedCount = 0;
+    const failedNames: string[] = [];
+
+    try {
+      for (const file of deletableDuplicates) {
+        try {
+          await deleteFileEntry(file);
+          removedCount++;
+        } catch {
+          failedNames.push(file.name);
+        }
+      }
+
+      if (removedCount > 0) {
+        toast.success(`${removedCount} duplicate file(s) removed`);
+      }
+      if (blockedDuplicates.length > 0) {
+        toast.error(`${blockedDuplicates.length} duplicate file(s) skipped (no permission)`);
+      }
+      if (failedNames.length > 0) {
+        toast.error(`Failed to remove duplicates: ${failedNames.join(", ")}`);
+      }
+
+      setSelectedFileIds((prev) => {
+        const next = new Set(prev);
+        duplicateIds.forEach((id) => next.delete(id));
+        return next;
+      });
+      await refresh(false, true);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleDeleteFolderClick = () => {
@@ -787,6 +866,11 @@ export default function TeacherUploadPage() {
     !!selectedCourse && ownedCourseCodes.includes(selectedCourse);
   const isShareOnlySelectedCourse =
     !!selectedCourse && shareOnlyCourseCodes.includes(selectedCourse);
+  const courseFileCounts = new Map<string, number>();
+  for (const file of allFiles) {
+    courseFileCounts.set(file.courseCode, (courseFileCounts.get(file.courseCode) ?? 0) + 1);
+  }
+  const duplicateCount = getDuplicateFileIds(files).length;
 
   return (
     <div>
@@ -806,7 +890,9 @@ export default function TeacherUploadPage() {
               }`}
             >
               <FiFolder size={14} />
-              <span className="max-w-[170px] truncate sm:max-w-[260px]">{s.subjectName} ({s.courseCode})</span>
+              <span className="max-w-[170px] truncate sm:max-w-[260px]">
+                {s.subjectName} ({s.courseCode}-{courseFileCounts.get(s.courseCode) ?? 0})
+              </span>
               {!ownedCourseCodes.includes(s.courseCode) && (
                 <span className="rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
                   {shareOnlyCourseCodes.includes(s.courseCode) ? "View Only" : "Shared"}
@@ -877,7 +963,7 @@ export default function TeacherUploadPage() {
                         onClick={handleRetryFailed}
                         className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
                       >
-                        Retry Failed Uploads
+                        Force Reupload Failed Files
                       </button>
                       <button
                         onClick={() => setFailedUploads([])}
@@ -946,6 +1032,13 @@ export default function TeacherUploadPage() {
                 className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Delete Selected ({selectedFileIds.size})
+              </button>
+              <button
+                onClick={handleRemoveDuplicates}
+                disabled={duplicateCount === 0 || deleting || uploading}
+                className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Remove Duplicates ({duplicateCount})
               </button>
             </div>
           )}

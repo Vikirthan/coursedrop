@@ -87,7 +87,7 @@ async function syncCourseFromDrive(courseCode: string): Promise<{ inserted: numb
 
   const { data: existingRows, error: existingError } = await supabase
     .from("study_files")
-    .select("drive_file_id")
+    .select("drive_file_id,name,size")
     .ilike("course_code", courseCode);
 
   if (existingError) {
@@ -99,6 +99,15 @@ async function syncCourseFromDrive(courseCode: string): Promise<{ inserted: numb
       .map((row) => {
         const value = (row as { drive_file_id?: unknown }).drive_file_id;
         return typeof value === "string" ? value.trim() : "";
+      })
+      .filter((value) => value.length > 0)
+  );
+  const existingSignatures = new Set(
+    (existingRows ?? [])
+      .map((row) => {
+        const name = String((row as { name?: unknown }).name ?? "").trim().toLowerCase();
+        const size = Number((row as { size?: unknown }).size ?? 0) || 0;
+        return name ? `${courseCode}|${name}|${size}` : "";
       })
       .filter((value) => value.length > 0)
   );
@@ -125,16 +134,25 @@ async function syncCourseFromDrive(courseCode: string): Promise<{ inserted: numb
 
       for (const driveFile of driveFiles) {
         const driveId = (driveFile.id ?? "").trim();
+        const driveName = (driveFile.name ?? "").trim();
+        const driveSize = Number.parseInt(driveFile.size ?? "0", 10) || 0;
+        const signature = `${courseCode}|${driveName.toLowerCase()}|${driveSize}`;
+
         if (!driveId || existingDriveIds.has(driveId)) {
           continue;
         }
 
+        if (existingSignatures.has(signature)) {
+          continue;
+        }
+
         existingDriveIds.add(driveId);
+        existingSignatures.add(signature);
         rowsToInsert.push({
           id: `file-${crypto.randomUUID()}`,
-          name: (driveFile.name ?? "").trim() || `drive-file-${driveId}`,
+          name: driveName || `drive-file-${driveId}`,
           type: deriveFileType(driveFile.name ?? "", driveFile.mimeType ?? ""),
-          size: Number.parseInt(driveFile.size ?? "0", 10) || 0,
+          size: driveSize,
           section: null,
           course_code: courseCode,
           subject_name: (ownerRow.subject_name ?? "").trim() || courseCode,
@@ -254,9 +272,20 @@ export async function GET(req: NextRequest) {
       throw error;
     }
 
+    const seenKeys = new Set<string>();
+    const uniqueRows = (data ?? []).filter((row) => {
+      const fileRow = row as FileRow;
+      const key = `${fileRow.course_code.trim().toUpperCase()}|${fileRow.name.trim().toLowerCase()}|${fileRow.size ?? 0}`;
+      if (seenKeys.has(key)) {
+        return false;
+      }
+      seenKeys.add(key);
+      return true;
+    });
+
     return NextResponse.json(
       {
-        files: (data ?? []).map((row) => toStudyFile(row as FileRow)),
+        files: uniqueRows.map((row) => toStudyFile(row as FileRow)),
         sync: syncResult
           ? {
               inserted: syncResult.inserted,

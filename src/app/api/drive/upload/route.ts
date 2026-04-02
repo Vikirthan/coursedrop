@@ -7,6 +7,7 @@ import { forbiddenJson, getSessionUserFromRequest, unauthorizedJson } from "@/li
 import {
   createSubjectFolder,
   deleteFileFromDrive,
+  listFilesInFolder,
   uploadFileToDrive,
   type UploadResult,
 } from "@/lib/drive";
@@ -80,6 +81,10 @@ function getErrorMessage(err: unknown): string {
   return "Unknown error";
 }
 
+function buildDriveDownloadUrl(fileId: string): string {
+  return `https://drive.google.com/uc?export=download&id=${fileId}`;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -90,6 +95,8 @@ export async function POST(req: NextRequest) {
     const uploadedByName = formData.get("uploadedByName") as string | null;
     const subjectName = formData.get("subjectName") as string | null;
     const section = formData.get("section") as string | null;
+    const overwrite = String(formData.get("overwrite") ?? "").trim().toLowerCase();
+    const shouldOverwrite = overwrite === "1" || overwrite === "true" || overwrite === "yes";
     const normalizedCourseCode = (courseCode ?? "").trim().toUpperCase();
 
     if (!file || !normalizedCourseCode) {
@@ -186,13 +193,29 @@ export async function POST(req: NextRequest) {
       throw duplicateQueryError;
     }
 
+    const { data: sameNameRows, error: sameNameQueryError } = await supabase
+      .from("study_files")
+      .select(FILE_SELECT_COLUMNS)
+      .ilike("course_code", normalizedCourseCode)
+      .ilike("name", file.name)
+      .limit(50);
+
+    if (sameNameQueryError) {
+      throw sameNameQueryError;
+    }
+
     const normalizedIncomingName = file.name.trim().toLowerCase();
     const duplicateRow = (potentialDuplicates ?? []).find((row) => {
       const candidate = row as StudyFileRow;
       return candidate.name.trim().toLowerCase() === normalizedIncomingName;
     }) as StudyFileRow | undefined;
 
-    if (duplicateRow) {
+    const sameNameRow = (sameNameRows ?? []).find((row) => {
+      const candidate = row as StudyFileRow;
+      return candidate.name.trim().toLowerCase() === normalizedIncomingName;
+    }) as StudyFileRow | undefined;
+
+    if (duplicateRow && !shouldOverwrite) {
       return NextResponse.json({
         file: toStudyFile(duplicateRow),
         duplicate: true,
@@ -200,10 +223,195 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const existingRowToReplace = sameNameRow ?? duplicateRow ?? undefined;
+
     let targetFolderId =
       folderId && folderId.trim().length > 0
         ? folderId
         : await createSubjectFolder(resolvedSubjectName, normalizedCourseCode);
+
+    const folderFiles = await listFilesInFolder(targetFolderId);
+    const matchingDriveFile = folderFiles.find((driveFile) => {
+      return (
+        driveFile.name.trim().toLowerCase() === normalizedIncomingName &&
+        (Number.parseInt(driveFile.size ?? "0", 10) || 0) === file.size
+      );
+    });
+    const sameNameDriveFiles = folderFiles.filter(
+      (driveFile) => driveFile.name.trim().toLowerCase() === normalizedIncomingName
+    );
+
+    if (matchingDriveFile?.id && !shouldOverwrite) {
+      const nowIso = new Date().toISOString();
+      const normalizedType =
+        file.name.split(".").pop()?.trim().toLowerCase() ||
+        file.type.trim().toLowerCase() ||
+        "file";
+      const rowToUpsert = {
+        name: file.name,
+        type: normalizedType,
+        size: file.size,
+        section: section?.trim() || null,
+        course_code: normalizedCourseCode,
+        subject_name: resolvedSubjectName,
+        uploaded_by: uploadedBy?.trim() || existingRowToReplace?.uploaded_by || "unknown",
+        uploaded_by_name:
+          uploadedByName?.trim() || existingRowToReplace?.uploaded_by_name || "Unknown",
+        upload_date: nowIso,
+        drive_file_id: matchingDriveFile.id,
+        drive_download_url: buildDriveDownloadUrl(matchingDriveFile.id),
+        drive_thumbnail_url: null,
+      };
+
+      if (existingRowToReplace) {
+        const { data: updated, error: updateError } = await supabase
+          .from("study_files")
+          .update(rowToUpsert)
+          .eq("id", existingRowToReplace.id)
+          .select(FILE_SELECT_COLUMNS)
+          .single();
+
+        if (updateError) {
+          throw new Error(
+            `Existing Drive file found, but metadata update failed: ${getErrorMessage(updateError)}`
+          );
+        }
+
+        return NextResponse.json({
+          file: toStudyFile(updated as StudyFileRow),
+          duplicate: true,
+          skipped: true,
+          reusedDriveFile: true,
+        });
+      }
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("study_files")
+        .insert({
+          id: `file-${crypto.randomUUID()}`,
+          ...rowToUpsert,
+        })
+        .select(FILE_SELECT_COLUMNS)
+        .single();
+
+      if (insertError) {
+        throw new Error(
+          `Existing Drive file found, but metadata save failed: ${getErrorMessage(insertError)}`
+        );
+      }
+
+      return NextResponse.json({
+        file: toStudyFile(inserted as StudyFileRow),
+        duplicate: true,
+        skipped: true,
+        reusedDriveFile: true,
+      });
+    }
+
+    if (shouldOverwrite && matchingDriveFile?.id) {
+      const previousDriveFileId = existingRowToReplace?.drive_file_id;
+      const nowIso = new Date().toISOString();
+      const normalizedType =
+        file.name.split(".").pop()?.trim().toLowerCase() ||
+        file.type.trim().toLowerCase() ||
+        "file";
+      const rowToUpsert = {
+        name: file.name,
+        type: normalizedType,
+        size: file.size,
+        section: section?.trim() || null,
+        course_code: normalizedCourseCode,
+        subject_name: resolvedSubjectName,
+        uploaded_by: uploadedBy?.trim() || existingRowToReplace?.uploaded_by || "unknown",
+        uploaded_by_name:
+          uploadedByName?.trim() || existingRowToReplace?.uploaded_by_name || "Unknown",
+        upload_date: nowIso,
+        drive_file_id: matchingDriveFile.id,
+        drive_download_url: buildDriveDownloadUrl(matchingDriveFile.id),
+        drive_thumbnail_url: null,
+      };
+
+      if (existingRowToReplace) {
+        const { data: updated, error: updateError } = await supabase
+          .from("study_files")
+          .update(rowToUpsert)
+          .eq("id", existingRowToReplace.id)
+          .select(FILE_SELECT_COLUMNS)
+          .single();
+
+        if (updateError) {
+          throw new Error(
+            `Retry matched an existing Drive file, but metadata update failed: ${getErrorMessage(updateError)}`
+          );
+        }
+
+        if (previousDriveFileId && previousDriveFileId !== matchingDriveFile.id) {
+          try {
+            await deleteFileFromDrive(previousDriveFileId);
+          } catch (cleanupErr) {
+            console.warn(
+              `[drive/upload] Failed to delete replaced Drive file ${previousDriveFileId}:`,
+              cleanupErr
+            );
+          }
+        }
+
+        return NextResponse.json({
+          file: toStudyFile(updated as StudyFileRow),
+          duplicate: false,
+          skipped: true,
+          reusedDriveFile: true,
+        });
+      }
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("study_files")
+        .insert({
+          id: `file-${crypto.randomUUID()}`,
+          ...rowToUpsert,
+        })
+        .select(FILE_SELECT_COLUMNS)
+        .single();
+
+      if (insertError) {
+        throw new Error(
+          `Retry matched an existing Drive file, but metadata save failed: ${getErrorMessage(insertError)}`
+        );
+      }
+
+      if (previousDriveFileId && previousDriveFileId !== matchingDriveFile.id) {
+        try {
+          await deleteFileFromDrive(previousDriveFileId);
+        } catch (cleanupErr) {
+          console.warn(
+            `[drive/upload] Failed to delete replaced Drive file ${previousDriveFileId}:`,
+            cleanupErr
+          );
+        }
+      }
+
+      return NextResponse.json({
+        file: toStudyFile(inserted as StudyFileRow),
+        duplicate: false,
+        skipped: true,
+        reusedDriveFile: true,
+      });
+    }
+
+    if (shouldOverwrite && sameNameDriveFiles.length > 0) {
+      for (const driveFile of sameNameDriveFiles) {
+        if (driveFile.id) {
+          try {
+            await deleteFileFromDrive(driveFile.id);
+          } catch (cleanupErr) {
+            console.warn(
+              `[drive/upload] Failed to delete existing Drive file ${driveFile.id} before overwrite:`,
+              cleanupErr
+            );
+          }
+        }
+      }
+    }
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const shouldRetryWithSharedFolder = (message: string): boolean =>
@@ -246,19 +454,60 @@ export async function POST(req: NextRequest) {
       file.type.trim().toLowerCase() ||
       "file";
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from("study_files")
-      .select(FILE_SELECT_COLUMNS)
-      .eq("drive_file_id", result.fileId)
-      .limit(1);
+    let savedRow: StudyFileRow | undefined;
 
-    if (existingError) {
-      throw existingError;
-    }
+    if (existingRowToReplace) {
+      const previousDriveFileId = existingRowToReplace.drive_file_id;
+      const updatePayload = {
+        name: file.name,
+        type: normalizedType,
+        size: file.size,
+        section: section?.trim() || null,
+        course_code: normalizedCourseCode,
+        subject_name: resolvedSubjectName,
+        uploaded_by: uploadedBy?.trim() || existingRowToReplace.uploaded_by || "unknown",
+        uploaded_by_name:
+          uploadedByName?.trim() || existingRowToReplace.uploaded_by_name || "Unknown",
+        upload_date: nowIso,
+        drive_file_id: result.fileId,
+        drive_download_url: result.downloadUrl,
+        drive_thumbnail_url: null,
+      };
 
-    let savedRow = (existingRows ?? [])[0] as StudyFileRow | undefined;
+      const { data: updated, error: updateError } = await supabase
+        .from("study_files")
+        .update(updatePayload)
+        .eq("id", existingRowToReplace.id)
+        .select(FILE_SELECT_COLUMNS)
+        .single();
 
-    if (!savedRow) {
+      if (updateError) {
+        try {
+          await deleteFileFromDrive(result.fileId);
+        } catch (rollbackErr) {
+          console.error(
+            "[drive/upload] Failed to rollback Drive file after DB update error:",
+            rollbackErr
+          );
+        }
+        throw new Error(
+          `Upload saved to Drive but metadata update failed: ${getErrorMessage(updateError)}`
+        );
+      }
+
+      savedRow = updated as StudyFileRow;
+
+      if (previousDriveFileId && previousDriveFileId !== result.fileId) {
+        try {
+          await deleteFileFromDrive(previousDriveFileId);
+        } catch (cleanupErr) {
+          console.warn(
+            `[drive/upload] Failed to delete replaced Drive file ${previousDriveFileId}:`,
+            cleanupErr
+          );
+        }
+      }
+    } else {
       const rowToInsert = {
         id: `file-${crypto.randomUUID()}`,
         name: file.name,
