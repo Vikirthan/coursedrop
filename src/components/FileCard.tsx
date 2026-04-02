@@ -14,6 +14,7 @@ interface FileCardProps {
   serialNumber?: number;
   selectable?: boolean;
   selected?: boolean;
+  deleting?: boolean;
   showUploader?: boolean;
   showSection?: boolean;
   onSelect?: (id: string) => void;
@@ -26,6 +27,7 @@ export default function FileCard({
   serialNumber,
   selectable,
   selected,
+  deleting = false,
   showUploader = false,
   showSection = false,
   onSelect,
@@ -88,9 +90,10 @@ export default function FileCard({
         {onDelete && (
           <button
             onClick={() => onDelete(file.id)}
-            className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100"
+            disabled={deleting}
+            className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <FiTrash2 size={14} /> Delete
+            <FiTrash2 size={14} /> {deleting ? "Removing..." : "Delete"}
           </button>
         )}
       </div>

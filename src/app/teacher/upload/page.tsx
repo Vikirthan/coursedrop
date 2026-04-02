@@ -93,6 +93,15 @@ function getDuplicateFileIds(items: StudyFile[]): string[] {
   return duplicates;
 }
 
+function removeFilesById(items: StudyFile[], ids: string[]): StudyFile[] {
+  if (ids.length === 0) {
+    return items;
+  }
+
+  const idSet = new Set(ids);
+  return items.filter((item) => !idSet.has(item.id));
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
@@ -260,7 +269,7 @@ export default function TeacherUploadPage() {
       window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [refresh]);
+  }, [refresh, user]);
 
   const getFolderIdForCourse = (courseCode: string): string | undefined =>
     allApprovedRequests.find(
@@ -670,6 +679,8 @@ export default function TeacherUploadPage() {
       await deleteFileEntry(file);
       toast.success("File deleted from Drive");
       setDeleteTarget(null);
+      setFiles((prev) => removeFilesById(prev, [deleteTarget]));
+      setAllFiles((prev) => removeFilesById(prev, [deleteTarget]));
       setSelectedFileIds((prev) => {
         const next = new Set(prev);
         next.delete(deleteTarget);
@@ -707,6 +718,13 @@ export default function TeacherUploadPage() {
       try {
         await deleteFileEntry(file);
         deletedCount++;
+        setFiles((prev) => removeFilesById(prev, [file.id]));
+        setAllFiles((prev) => removeFilesById(prev, [file.id]));
+        setSelectedFileIds((prev) => {
+          const next = new Set(prev);
+          next.delete(file.id);
+          return next;
+        });
       } catch {
         failedNames.push(file.name);
       }
@@ -776,6 +794,8 @@ export default function TeacherUploadPage() {
         duplicateIds.forEach((id) => next.delete(id));
         return next;
       });
+      setFiles((prev) => removeFilesById(prev, duplicateIds));
+      setAllFiles((prev) => removeFilesById(prev, duplicateIds));
       await refresh(false, true);
     } finally {
       setDeleting(false);
@@ -1053,6 +1073,7 @@ export default function TeacherUploadPage() {
                   serialNumber={index + 1}
                   selectable={f.uploadedBy === user?.id || ownedCourseCodes.includes(f.courseCode)}
                   selected={selectedFileIds.has(f.id)}
+                  deleting={deleting && deleteTarget === f.id}
                   onSelect={handleSelectFile}
                   onDelete={
                     f.uploadedBy === user?.id || ownedCourseCodes.includes(f.courseCode)

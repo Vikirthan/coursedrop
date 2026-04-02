@@ -34,6 +34,15 @@ interface TeacherOption {
   approved: boolean;
 }
 
+function removeFilesById(items: StudyFile[], ids: string[]): StudyFile[] {
+  if (ids.length === 0) {
+    return items;
+  }
+
+  const idSet = new Set(ids);
+  return items.filter((item) => !idSet.has(item.id));
+}
+
 export default function AdminMaterialsPage() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [approvedRequests, setApprovedRequests] = useState<SubjectRequest[]>([]);
@@ -160,6 +169,7 @@ export default function AdminMaterialsPage() {
       await apiDeleteFile(deleteTarget);
       toast.success("File deleted");
       setDeleteTarget(null);
+      setFiles((prev) => removeFilesById(prev, [deleteTarget]));
       await refresh();
     } catch (err) {
       console.error(err);
