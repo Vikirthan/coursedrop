@@ -4,7 +4,7 @@
 // (Real Google Drive integration)
 // ============================================================
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   apiDeleteFile,
@@ -35,7 +35,13 @@ interface UploadProgressState {
 type UploadApiResponse = {
   file: StudyFile;
   folderIdUsed?: string;
+  duplicate?: boolean;
 };
+
+interface FailedUpload {
+  file: File;
+  reason: string;
+}
 
 function formatEta(seconds: number | null): string {
   if (seconds === null || !Number.isFinite(seconds) || seconds < 0) {
@@ -67,6 +73,28 @@ function toPercent(loaded: number, total: number): number {
   return Math.max(0, Math.min(raw, 100));
 }
 
+function getFileSignature(name: string, size: number): string {
+  return `${name.trim().toLowerCase()}::${size}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function isRetryableUploadError(message: string): boolean {
+  const normalized = message.trim().toLowerCase();
+  return (
+    normalized.includes("network") ||
+    normalized.includes("timeout") ||
+    normalized.includes("429") ||
+    normalized.includes("502") ||
+    normalized.includes("503") ||
+    normalized.includes("504")
+  );
+}
+
 export default function TeacherUploadPage() {
   const { user } = useAuth();
   const [allApprovedRequests, setAllApprovedRequests] = useState<SubjectRequest[]>([]);
@@ -76,11 +104,14 @@ export default function TeacherUploadPage() {
   const [selectedCourse, setSelectedCourse] = useState<string | null>(null);
   const [section, setSection] = useState("");
   const [files, setFiles] = useState<StudyFile[]>([]);
+  const [selectedFileIds, setSelectedFileIds] = useState<Set<string>>(new Set());
   const [uploading, setUploading] = useState(false);
+  const [failedUploads, setFailedUploads] = useState<FailedUpload[]>([]);
   const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(
     null
   );
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [showBatchDeleteConfirm, setShowBatchDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [deleteFolderLoading, setDeleteFolderLoading] = useState(false);
@@ -88,7 +119,7 @@ export default function TeacherUploadPage() {
   const activeUploadXhrRef = useRef<XMLHttpRequest | null>(null);
   const cancelUploadRef = useRef(false);
 
-  const refresh = async (showError = true) => {
+  const refresh = useCallback(async (showError = true, forceSync = false) => {
     if (!user) return;
 
     const teacherKeys = Array.from(
@@ -157,8 +188,16 @@ export default function TeacherUploadPage() {
         if (!stillAccessible) {
           setSelectedCourse(null);
           setFiles([]);
+          setSelectedFileIds(new Set());
         } else {
-          setFiles(await apiListFiles(selectedCourse));
+          const nextFiles = await apiListFiles(selectedCourse, {
+            forceSync,
+          });
+          setFiles(nextFiles);
+          setSelectedFileIds((prev) => {
+            const nextIds = new Set(nextFiles.map((file) => file.id));
+            return new Set(Array.from(prev).filter((id) => nextIds.has(id)));
+          });
         }
       }
     } catch (err) {
@@ -167,11 +206,11 @@ export default function TeacherUploadPage() {
         toast.error(err instanceof Error ? err.message : "Failed to load upload data");
       }
     }
-  };
+  }, [user, selectedCourse]);
 
   useEffect(() => {
-    void refresh(true);
-  }, [user, selectedCourse]);
+    void refresh(true, true);
+  }, [refresh, user]);
 
   useEffect(() => {
     if (!user) {
@@ -179,26 +218,30 @@ export default function TeacherUploadPage() {
     }
 
     const tick = () => {
-      void refresh(false);
+      void refresh(false, false);
     };
 
     const intervalId = window.setInterval(tick, 8000);
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible") {
-        tick();
+        void refresh(false, true);
       }
     };
 
-    window.addEventListener("focus", tick);
+    const handleFocus = () => {
+      void refresh(false, true);
+    };
+
+    window.addEventListener("focus", handleFocus);
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       window.clearInterval(intervalId);
-      window.removeEventListener("focus", tick);
+      window.removeEventListener("focus", handleFocus);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [user, selectedCourse]);
+  }, [refresh]);
 
   const getFolderIdForCourse = (courseCode: string): string | undefined =>
     allApprovedRequests.find(
@@ -275,7 +318,7 @@ export default function TeacherUploadPage() {
   };
 
   const handleUpload = async (fileList: File[]) => {
-    if (!selectedCourse || !user) return;
+    if (!selectedCourse || !user || uploading) return;
 
     if (shareOnlyCourseCodes.includes(selectedCourse)) {
       toast.error("This folder is share-only. Upload is disabled by admin.");
@@ -285,36 +328,72 @@ export default function TeacherUploadPage() {
     const normalizedSection = section.trim();
     const folderId = getFolderIdForCourse(selectedCourse);
 
+    const existingSignatures = new Set(
+      files.map((file) => getFileSignature(file.name, file.size))
+    );
+    const queuedSignatures = new Set<string>();
+    const duplicateNames: string[] = [];
+    const uploadQueue: File[] = [];
+
+    for (const candidate of fileList) {
+      const sig = getFileSignature(candidate.name, candidate.size);
+      if (existingSignatures.has(sig) || queuedSignatures.has(sig)) {
+        duplicateNames.push(candidate.name);
+        continue;
+      }
+      queuedSignatures.add(sig);
+      uploadQueue.push(candidate);
+    }
+
+    if (duplicateNames.length > 0) {
+      toast.error(
+        `${duplicateNames.length} duplicate file(s) skipped (same name and size).`
+      );
+    }
+
+    if (uploadQueue.length === 0) {
+      return;
+    }
+
     setUploading(true);
+    setFailedUploads([]);
     cancelUploadRef.current = false;
     let uploaded = 0;
     let cancelled = false;
+    const nextFailedUploads: FailedUpload[] = [];
+    const expectedVisibleSignatures = new Set<string>();
 
     const currentSubject = subjects.find((s) => s.courseCode === selectedCourse);
     let effectiveFolderId = folderId;
-    const totalBytes = fileList.reduce((sum, f) => sum + f.size, 0);
+    const totalBytes = uploadQueue.reduce((sum, f) => sum + f.size, 0);
     const uploadStartedAt = Date.now();
     let completedBytes = 0;
 
     setUploadProgress({
-      totalFiles: fileList.length,
+      totalFiles: uploadQueue.length,
       completedFiles: 0,
-      currentFileName: fileList[0]?.name ?? "",
+      currentFileName: uploadQueue[0]?.name ?? "",
       currentFileProgress: 0,
       overallProgress: 0,
       etaSeconds: null,
     });
 
-    for (let i = 0; i < fileList.length; i++) {
+    for (let i = 0; i < uploadQueue.length; i++) {
       if (cancelUploadRef.current) {
         cancelled = true;
+        for (let j = i; j < uploadQueue.length; j++) {
+          nextFailedUploads.push({
+            file: uploadQueue[j],
+            reason: "Upload cancelled",
+          });
+        }
         break;
       }
 
-      const f = fileList[i];
+      const f = uploadQueue[i];
       try {
         setUploadProgress((prev) => ({
-          totalFiles: prev?.totalFiles ?? fileList.length,
+          totalFiles: prev?.totalFiles ?? uploadQueue.length,
           completedFiles: i,
           currentFileName: f.name,
           currentFileProgress: 0,
@@ -335,24 +414,44 @@ export default function TeacherUploadPage() {
           formData.append("section", normalizedSection);
         }
 
-        const data = await uploadFileWithProgress(formData, (loadedBytes) => {
-          const cappedLoadedBytes = Math.min(Math.max(loadedBytes, 0), f.size);
-          const uploadedBytes = completedBytes + cappedLoadedBytes;
-          const elapsedSeconds = Math.max((Date.now() - uploadStartedAt) / 1000, 0.1);
-          const bytesPerSecond = uploadedBytes / elapsedSeconds;
-          const remainingBytes = Math.max(totalBytes - uploadedBytes, 0);
-          const etaSeconds =
-            bytesPerSecond > 0 ? Math.ceil(remainingBytes / bytesPerSecond) : null;
+        let data: UploadApiResponse | null = null;
+        let lastError: unknown = null;
 
-          setUploadProgress({
-            totalFiles: fileList.length,
-            completedFiles: i,
-            currentFileName: f.name,
-            currentFileProgress: toPercent(cappedLoadedBytes, f.size),
-            overallProgress: toPercent(uploadedBytes, totalBytes),
-            etaSeconds,
-          });
-        });
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            data = await uploadFileWithProgress(formData, (loadedBytes) => {
+              const cappedLoadedBytes = Math.min(Math.max(loadedBytes, 0), f.size);
+              const uploadedBytes = completedBytes + cappedLoadedBytes;
+              const elapsedSeconds = Math.max((Date.now() - uploadStartedAt) / 1000, 0.1);
+              const bytesPerSecond = uploadedBytes / elapsedSeconds;
+              const remainingBytes = Math.max(totalBytes - uploadedBytes, 0);
+              const etaSeconds =
+                bytesPerSecond > 0 ? Math.ceil(remainingBytes / bytesPerSecond) : null;
+
+              setUploadProgress({
+                totalFiles: uploadQueue.length,
+                completedFiles: i,
+                currentFileName: f.name,
+                currentFileProgress: toPercent(cappedLoadedBytes, f.size),
+                overallProgress: toPercent(uploadedBytes, totalBytes),
+                etaSeconds,
+              });
+            });
+            break;
+          } catch (attemptErr) {
+            lastError = attemptErr;
+            const message =
+              attemptErr instanceof Error ? attemptErr.message : "Upload failed";
+            if (attempt >= 3 || !isRetryableUploadError(message)) {
+              break;
+            }
+            await sleep(400 * attempt);
+          }
+        }
+
+        if (!data) {
+          throw (lastError instanceof Error ? lastError : new Error("Upload failed"));
+        }
 
         completedBytes += f.size;
 
@@ -364,17 +463,32 @@ export default function TeacherUploadPage() {
           });
         }
 
+        if (data.duplicate) {
+          expectedVisibleSignatures.add(getFileSignature(f.name, f.size));
+          continue;
+        }
+
         // Metadata is now persisted atomically by /api/drive/upload.
         uploaded++;
+        expectedVisibleSignatures.add(getFileSignature(f.name, f.size));
+        setFiles((prev) => {
+          const exists = prev.some(
+            (file) => getFileSignature(file.name, file.size) === getFileSignature(data.file.name, data.file.size)
+          );
+          if (exists) {
+            return prev;
+          }
+          return [data.file, ...prev];
+        });
 
         setUploadProgress({
-          totalFiles: fileList.length,
+          totalFiles: uploadQueue.length,
           completedFiles: i + 1,
           currentFileName: f.name,
           currentFileProgress: 100,
           overallProgress: toPercent(completedBytes, totalBytes),
           etaSeconds:
-            i + 1 === fileList.length
+            i + 1 === uploadQueue.length
               ? 0
               : Math.ceil(
                   Math.max(
@@ -385,14 +499,20 @@ export default function TeacherUploadPage() {
                 ),
         });
       } catch (err) {
+        const message = err instanceof Error ? err.message : `Failed to upload ${f.name}`;
         if (err instanceof Error && err.message === "Upload cancelled") {
           cancelled = true;
+          nextFailedUploads.push({ file: f, reason: message });
+          for (let j = i + 1; j < uploadQueue.length; j++) {
+            nextFailedUploads.push({
+              file: uploadQueue[j],
+              reason: "Upload cancelled",
+            });
+          }
           break;
         }
         console.error(`Upload failed for ${f.name}:`, err);
-        toast.error(
-          err instanceof Error ? err.message : `Failed to upload ${f.name}`
-        );
+        nextFailedUploads.push({ file: f, reason: message });
       }
     }
 
@@ -404,14 +524,82 @@ export default function TeacherUploadPage() {
       toast.success(`${uploaded} file(s) uploaded to Google Drive!`);
     }
 
+    if (nextFailedUploads.length > 0) {
+      setFailedUploads(nextFailedUploads);
+      const failedNames = nextFailedUploads.map((entry) => entry.file.name).join(", ");
+      toast.error(`Failed uploads: ${failedNames}`);
+    }
+
     setUploadProgress(null);
     activeUploadXhrRef.current = null;
     setUploading(false);
-    refresh();
+
+    if (selectedCourse && expectedVisibleSignatures.size > 0) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const latestFiles = await apiListFiles(selectedCourse, {
+          forceSync: true,
+        });
+        setFiles(latestFiles);
+        setSelectedFileIds((prev) => {
+          const nextIds = new Set(latestFiles.map((file) => file.id));
+          return new Set(Array.from(prev).filter((id) => nextIds.has(id)));
+        });
+
+        const latestSignatures = new Set(
+          latestFiles.map((file) => getFileSignature(file.name, file.size))
+        );
+        const missing = Array.from(expectedVisibleSignatures).filter(
+          (sig) => !latestSignatures.has(sig)
+        );
+        if (missing.length === 0) {
+          break;
+        }
+        await sleep(800);
+      }
+    }
+
+    await refresh(false, true);
+  };
+
+  const handleRetryFailed = () => {
+    if (failedUploads.length === 0 || uploading) {
+      return;
+    }
+    void handleUpload(failedUploads.map((entry) => entry.file));
   };
 
   const handleDownload = (file: StudyFile) => {
     window.open(`/api/drive/download?fileId=${file.driveFileId}`, "_blank");
+  };
+
+  const handleSelectFile = (id: string) => {
+    setSelectedFileIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAllFiles = () => {
+    const deletableIds = files
+      .filter((f) => f.uploadedBy === user?.id || ownedCourseCodes.includes(f.courseCode))
+      .map((f) => f.id);
+
+    if (deletableIds.length === 0) {
+      return;
+    }
+
+    const allSelected = deletableIds.every((id) => selectedFileIds.has(id));
+    if (allSelected) {
+      setSelectedFileIds(new Set());
+      return;
+    }
+
+    setSelectedFileIds(new Set(deletableIds));
   };
 
   const handleDelete = async () => {
@@ -447,6 +635,11 @@ export default function TeacherUploadPage() {
       await apiDeleteFile(deleteTarget);
       toast.success("File deleted from Drive");
       setDeleteTarget(null);
+      setSelectedFileIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deleteTarget);
+        return next;
+      });
       await refresh();
     } catch (err) {
       console.error(err);
@@ -454,6 +647,60 @@ export default function TeacherUploadPage() {
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedFileIds.size === 0 || !user) {
+      setShowBatchDeleteConfirm(false);
+      return;
+    }
+
+    setDeleting(true);
+
+    const selectedFiles = files.filter((file) => selectedFileIds.has(file.id));
+    const deletableFiles = selectedFiles.filter(
+      (file) => file.uploadedBy === user.id || ownedCourseCodes.includes(file.courseCode)
+    );
+    const blockedFiles = selectedFiles.filter(
+      (file) => !(file.uploadedBy === user.id || ownedCourseCodes.includes(file.courseCode))
+    );
+
+    let deletedCount = 0;
+    const failedNames: string[] = [];
+
+    for (const file of deletableFiles) {
+      try {
+        if (file.driveFileId) {
+          const res = await fetch(`/api/drive/delete?fileId=${file.driveFileId}`, {
+            method: "DELETE",
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || "Delete failed");
+          }
+        }
+
+        await apiDeleteFile(file.id);
+        deletedCount++;
+      } catch {
+        failedNames.push(file.name);
+      }
+    }
+
+    if (deletedCount > 0) {
+      toast.success(`${deletedCount} file(s) deleted`);
+    }
+    if (blockedFiles.length > 0) {
+      toast.error(`${blockedFiles.length} file(s) skipped (no permission)`);
+    }
+    if (failedNames.length > 0) {
+      toast.error(`Failed to delete: ${failedNames.join(", ")}`);
+    }
+
+    setSelectedFileIds(new Set());
+    setShowBatchDeleteConfirm(false);
+    setDeleting(false);
+    await refresh(false, true);
   };
 
   const handleDeleteFolderClick = () => {
@@ -617,6 +864,31 @@ export default function TeacherUploadPage() {
               <div className="mb-6">
                 <UploadZone onFilesSelected={handleUpload} uploading={uploading} />
 
+                {failedUploads.length > 0 && !uploading && (
+                  <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                    <p className="text-sm font-semibold text-amber-900">
+                      {failedUploads.length} file(s) failed. Retry from here.
+                    </p>
+                    <p className="mt-1 text-xs text-amber-800">
+                      {failedUploads.map((entry) => entry.file.name).join(", ")}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        onClick={handleRetryFailed}
+                        className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+                      >
+                        Retry Failed Uploads
+                      </button>
+                      <button
+                        onClick={() => setFailedUploads([])}
+                        className="rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
+                      >
+                        Clear Failed List
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {uploading && uploadProgress && (
                   <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                     <div className="mb-2 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
@@ -654,14 +926,41 @@ export default function TeacherUploadPage() {
 
           {/* Existing files */}
           <SectionHeader title={`Files in ${selectedCourse}`} />
+          {files.length > 0 && (
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+              <button
+                onClick={handleSelectAllFiles}
+                className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+              >
+                {files
+                  .filter(
+                    (f) => f.uploadedBy === user?.id || ownedCourseCodes.includes(f.courseCode)
+                  )
+                  .every((f) => selectedFileIds.has(f.id))
+                  ? "Deselect All"
+                  : "Select All"}
+              </button>
+              <button
+                onClick={() => setShowBatchDeleteConfirm(true)}
+                disabled={selectedFileIds.size === 0 || deleting}
+                className="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Delete Selected ({selectedFileIds.size})
+              </button>
+            </div>
+          )}
           {files.length === 0 ? (
             <EmptyState title="No files yet" subtitle="Upload your first file above." />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {files.map((f) => (
+              {files.map((f, index) => (
                 <FileCard
                   key={f.id}
                   file={f}
+                  serialNumber={index + 1}
+                  selectable={f.uploadedBy === user?.id || ownedCourseCodes.includes(f.courseCode)}
+                  selected={selectedFileIds.has(f.id)}
+                  onSelect={handleSelectFile}
                   onDelete={
                     f.uploadedBy === user?.id || ownedCourseCodes.includes(f.courseCode)
                       ? (id) => setDeleteTarget(id)
@@ -683,6 +982,16 @@ export default function TeacherUploadPage() {
         danger
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
+      />
+
+      <ConfirmModal
+        open={showBatchDeleteConfirm}
+        title="Delete Selected Files"
+        message={`Are you sure you want to delete ${selectedFileIds.size} selected file(s)? This will remove them from Google Drive too.`}
+        confirmLabel={deleting ? "Deleting..." : "Delete Selected"}
+        danger
+        onConfirm={handleBatchDelete}
+        onCancel={() => setShowBatchDeleteConfirm(false)}
       />
 
       <PasswordModal

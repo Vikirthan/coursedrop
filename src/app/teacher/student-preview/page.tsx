@@ -138,7 +138,9 @@ export default function TeacherStudentPreviewPage() {
 
     const loadFiles = async (showError = true, resetSelection = false) => {
       try {
-        const nextFiles = await apiListFiles(selectedCourse);
+        const nextFiles = await apiListFiles(selectedCourse, {
+          forceSync: resetSelection,
+        });
         if (cancelled) {
           return;
         }
@@ -336,10 +338,11 @@ export default function TeacherStudentPreviewPage() {
             />
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {files.map((file) => (
+              {files.map((file, index) => (
                 <FileCard
                   key={file.id}
                   file={file}
+                  serialNumber={index + 1}
                   selectable
                   selected={selectedFiles.has(file.id)}
                   showSection

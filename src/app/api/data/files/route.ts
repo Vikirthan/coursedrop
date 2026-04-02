@@ -39,7 +39,7 @@ type RequestRow = {
 const FILE_SELECT_COLUMNS =
   "id,name,type,size,section,course_code,subject_name,uploaded_by,uploaded_by_name,upload_date,drive_file_id,drive_download_url,drive_thumbnail_url";
 
-const DRIVE_SYNC_MIN_INTERVAL_MS = 60_000;
+const DRIVE_SYNC_MIN_INTERVAL_MS = 10_000;
 const lastDriveSyncMsByCourse = new Map<string, number>();
 
 function shouldSyncFromQuery(raw: string): boolean {
@@ -220,13 +220,14 @@ export async function GET(req: NextRequest) {
   try {
     const courseCode = (req.nextUrl.searchParams.get("courseCode") ?? "").trim().toUpperCase();
     const sync = shouldSyncFromQuery(req.nextUrl.searchParams.get("sync") ?? "");
+    const forceSync = shouldSyncFromQuery(req.nextUrl.searchParams.get("forceSync") ?? "");
     let syncResult: { inserted: number; warnings: string[] } | null = null;
 
     if (courseCode && sync) {
       const nowMs = Date.now();
       const lastSyncMs = lastDriveSyncMsByCourse.get(courseCode) ?? 0;
 
-      if (nowMs - lastSyncMs >= DRIVE_SYNC_MIN_INTERVAL_MS) {
+      if (forceSync || nowMs - lastSyncMs >= DRIVE_SYNC_MIN_INTERVAL_MS) {
         try {
           syncResult = await syncCourseFromDrive(courseCode);
           lastDriveSyncMsByCourse.set(courseCode, nowMs);

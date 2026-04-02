@@ -3,7 +3,7 @@
 // CourseDrop — Teacher Dashboard
 // ============================================================
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import {
   apiGetTeacherSharedCourses,
@@ -20,18 +20,10 @@ export default function TeacherDashboard() {
   const [requests, setRequests] = useState<SubjectRequest[]>([]);
   const [fileCount, setFileCount] = useState(0);
   const [accessibleSubjectCount, setAccessibleSubjectCount] = useState(0);
+  const hasSessionUser = isInitialized && !!user;
 
   useEffect(() => {
-    // Only clear data if initialized and there's no user (truly logged out)
-    if (isInitialized && !user) {
-      setRequests([]);
-      setFileCount(0);
-      setAccessibleSubjectCount(0);
-      return;
-    }
-
-    // Don't run if not yet initialized or no user
-    if (!isInitialized || !user) {
+    if (!hasSessionUser || !user) {
       return;
     }
 
@@ -88,7 +80,7 @@ export default function TeacherDashboard() {
       void load();
     };
 
-    tick();
+    const initialLoadId = window.setTimeout(tick, 0);
 
     const intervalId = window.setInterval(tick, 8000);
 
@@ -102,13 +94,20 @@ export default function TeacherDashboard() {
     document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
+      window.clearTimeout(initialLoadId);
       window.clearInterval(intervalId);
       window.removeEventListener("focus", tick);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [user]);
+  }, [hasSessionUser, user]);
 
-  const pending = requests.filter((r) => r.status === "pending").length;
+  const visibleRequests = useMemo(
+    () => (hasSessionUser ? requests : []),
+    [hasSessionUser, requests]
+  );
+  const pending = visibleRequests.filter((r) => r.status === "pending").length;
+  const visibleFileCount = hasSessionUser ? fileCount : 0;
+  const visibleAccessibleSubjectCount = hasSessionUser ? accessibleSubjectCount : 0;
 
   return (
     <div>
@@ -122,7 +121,7 @@ export default function TeacherDashboard() {
       <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="Total Requests"
-          value={requests.length}
+          value={visibleRequests.length}
           icon={<FiSend />}
           accent="blue"
         />
@@ -134,13 +133,13 @@ export default function TeacherDashboard() {
         />
         <StatCard
           label="Accessible Subjects"
-          value={accessibleSubjectCount}
+          value={visibleAccessibleSubjectCount}
           icon={<FiCheckCircle />}
           accent="green"
         />
         <StatCard
           label="Files Uploaded"
-          value={fileCount}
+          value={visibleFileCount}
           icon={<FiFileText />}
           accent="purple"
         />
@@ -159,7 +158,7 @@ export default function TeacherDashboard() {
             </tr>
           </thead>
           <tbody>
-            {requests.slice(0, 6).map((r) => (
+            {visibleRequests.slice(0, 6).map((r) => (
               <tr key={r.id} className="border-b border-slate-50 hover:bg-slate-50/50">
                 <td className="px-5 py-3 font-medium text-slate-700">{r.subjectName}</td>
                 <td className="px-5 py-3">
@@ -173,7 +172,7 @@ export default function TeacherDashboard() {
                 </td>
               </tr>
             ))}
-            {requests.length === 0 && (
+            {visibleRequests.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-5 py-8 text-center text-slate-400">
                   No requests yet — submit one to get started.

@@ -1,6 +1,5 @@
-const CACHE_NAME = "coursedrop-v3";
+const CACHE_NAME = "coursedrop-v4";
 const STATIC_ASSETS = [
-  "/",
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",
@@ -22,6 +21,10 @@ function isCacheableStaticRequest(request, url) {
     return false;
   }
 
+  if (url.pathname.startsWith("/_next/data/")) {
+    return false;
+  }
+
   if (STATIC_ASSETS.includes(url.pathname)) {
     return true;
   }
@@ -33,7 +36,6 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)).catch(() => undefined)
   );
-  self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -75,7 +77,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, cloned)).catch(() => undefined);
           return response;
         })
-        .catch(() => caches.match("/"));
+        .catch(() => cached ?? Response.error());
     })
   );
 });

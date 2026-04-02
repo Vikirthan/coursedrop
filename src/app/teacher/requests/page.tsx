@@ -3,7 +3,7 @@
 // CourseDrop — Teacher: Submit & Track Subject Requests
 // ============================================================
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiCreateRequest, apiListRequests } from "@/lib/clientDataApi";
 import { SubjectRequest } from "@/lib/types";
@@ -23,7 +23,7 @@ export default function TeacherRequestsPage() {
   const [department, setDepartment] = useState("");
   const [message, setMessage] = useState("");
 
-  const refresh = async (showError = true) => {
+  const refresh = useCallback(async (showError = true) => {
     if (!user) return;
     try {
       const teacherKeys = Array.from(
@@ -43,11 +43,15 @@ export default function TeacherRequestsPage() {
         toast.error(err instanceof Error ? err.message : "Failed to load requests");
       }
     }
-  };
+  }, [user]);
 
   useEffect(() => {
-    void refresh(true);
-  }, [user]);
+    const timeoutId = window.setTimeout(() => {
+      void refresh(true);
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [refresh, user]);
 
   useEffect(() => {
     if (!user) {
@@ -74,7 +78,7 @@ export default function TeacherRequestsPage() {
       window.removeEventListener("focus", tick);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [user]);
+  }, [refresh]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

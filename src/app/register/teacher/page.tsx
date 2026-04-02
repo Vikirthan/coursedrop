@@ -104,7 +104,7 @@ export default function TeacherRegisterPage() {
           setError(message);
         }
       }
-    } catch (err) {
+    } catch {
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -133,7 +133,7 @@ export default function TeacherRegisterPage() {
             </h1>
             <p className="text-slate-600 dark:text-slate-400 mb-6">
               Your Teacher/CR account has been created and is pending admin approval.
-              Once approved, you'll be able to log in with your credentials.
+              Once approved, you&apos;ll be able to log in with your credentials.
             </p>
             <Link
               href="/login/teacher"
@@ -143,7 +143,7 @@ export default function TeacherRegisterPage() {
             </Link>
             <p className="mt-6 text-sm text-slate-500 dark:text-slate-400">
               <Link href="/" className="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">
-                ← Back to home
+                &larr; Back to home
               </Link>
             </p>
           </div>

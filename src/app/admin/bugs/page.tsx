@@ -3,7 +3,7 @@
 // CourseDrop — Admin Bug Inbox
 // ============================================================
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { apiListBugReports, apiUpdateBugReport } from "@/lib/clientDataApi";
 import { BugReport, BugReportStatus } from "@/lib/types";
@@ -35,7 +35,7 @@ export default function AdminBugsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
-  const refresh = () => {
+  const refresh = useCallback(() => {
     setRefreshing(true);
     apiListBugReports(filter === "all" ? undefined : filter)
       .then((next) => setReports(next))
@@ -44,11 +44,15 @@ export default function AdminBugsPage() {
         toast.error(err instanceof Error ? err.message : "Failed to load bug reports");
       })
       .finally(() => setRefreshing(false));
-  };
+  }, [filter]);
 
   useEffect(() => {
-    refresh();
-  }, [filter]);
+    const timeoutId = window.setTimeout(() => {
+      refresh();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [refresh]);
 
   const filtered = useMemo(() => reports, [reports]);
 

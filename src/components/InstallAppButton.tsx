@@ -24,7 +24,9 @@ export default function InstallAppButton() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    setIsInstalled(isStandaloneMode());
+    const timeoutId = window.setTimeout(() => {
+      setIsInstalled(isStandaloneMode());
+    }, 0);
 
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -40,6 +42,7 @@ export default function InstallAppButton() {
     window.addEventListener("appinstalled", onAppInstalled);
 
     return () => {
+      window.clearTimeout(timeoutId);
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
       window.removeEventListener("appinstalled", onAppInstalled);
     };

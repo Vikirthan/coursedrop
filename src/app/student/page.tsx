@@ -83,7 +83,9 @@ export default function StudentPortal() {
 
     const load = async (showError = true, resetSelection = false) => {
       try {
-        const nextFiles = await apiListFiles(selectedCourse);
+        const nextFiles = await apiListFiles(selectedCourse, {
+          forceSync: resetSelection,
+        });
         if (cancelled) {
           return;
         }
@@ -297,10 +299,11 @@ export default function StudentPortal() {
               />
             ) : (
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {files.map((f) => (
+                {files.map((f, index) => (
                   <FileCard
                     key={f.id}
                     file={f}
+                    serialNumber={index + 1}
                     selectable
                     selected={selectedFiles.has(f.id)}
                     showSection

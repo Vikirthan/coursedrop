@@ -6,11 +6,12 @@
 import React from "react";
 import { StudyFile } from "@/lib/types";
 import { formatBytes, formatDate } from "@/lib/utils";
-import { FileTypeIcon, StatusChip } from "./ui";
+import { FileTypeIcon } from "./ui";
 import { FiDownload, FiTrash2 } from "react-icons/fi";
 
 interface FileCardProps {
   file: StudyFile;
+  serialNumber?: number;
   selectable?: boolean;
   selected?: boolean;
   showUploader?: boolean;
@@ -22,6 +23,7 @@ interface FileCardProps {
 
 export default function FileCard({
   file,
+  serialNumber,
   selectable,
   selected,
   showUploader = false,
@@ -36,6 +38,12 @@ export default function FileCard({
         selected ? "border-indigo-400 ring-2 ring-indigo-200" : "border-slate-200"
       }`}
     >
+      {typeof serialNumber === "number" && (
+        <div className="absolute left-3 top-3 rounded-md bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">
+          #{serialNumber}
+        </div>
+      )}
+
       {/* select checkbox */}
       {selectable && (
         <input
@@ -46,7 +54,7 @@ export default function FileCard({
         />
       )}
 
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-3 pt-5">
         <div className="mt-0.5 shrink-0">
           <FileTypeIcon ext={file.type} />
         </div>

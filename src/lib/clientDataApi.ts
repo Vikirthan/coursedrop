@@ -118,12 +118,13 @@ export async function apiUpdateRequest(payload: {
 
 export async function apiListFiles(
   courseCode?: string,
-  options?: { syncFromDrive?: boolean }
+  options?: { syncFromDrive?: boolean; forceSync?: boolean }
 ): Promise<StudyFile[]> {
   const shouldSync = !!courseCode && options?.syncFromDrive !== false;
   const qs = makeQuery({
     courseCode,
     sync: shouldSync ? "1" : undefined,
+    forceSync: shouldSync && options?.forceSync ? "1" : undefined,
   });
   const res = await fetchNoStore(`/api/data/files${qs}`);
   const data = await parseJson<{ files: StudyFile[] }>(res);

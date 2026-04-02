@@ -3,7 +3,7 @@
 // CourseDrop — Admin: Browse All Materials
 // ============================================================
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   apiAdminCreateFolder,
   apiDeleteFile,
@@ -15,6 +15,7 @@ import {
   apiSetCourseSharing,
   apiUpdateRequest,
 } from "@/lib/clientDataApi";
+import { formatTeacherDisplayName } from "@/lib/utils";
 import { StudyFile, Subject, SubjectRequest } from "@/lib/types";
 import { SectionHeader, EmptyState } from "@/components/ui";
 import FileCard from "@/components/FileCard";
@@ -29,6 +30,7 @@ interface TeacherOption {
   uid: string;
   email: string;
   department: string | null;
+  designation?: string | null;
   approved: boolean;
 }
 
@@ -56,12 +58,14 @@ export default function AdminMaterialsPage() {
   });
   const [creatingFolder, setCreatingFolder] = useState(false);
 
-  const refresh = async () => {
+  const refresh = useCallback(async (showError = true, forceSync = false) => {
     try {
       const [nextSubjects, nextApprovedRequests, nextFiles] = await Promise.all([
         apiListSubjects(),
         apiListRequests({ status: "approved" }),
-        apiListFiles(selectedCourse ?? undefined),
+        apiListFiles(selectedCourse ?? undefined, {
+          forceSync: !!selectedCourse && forceSync,
+        }),
       ]);
 
       setSubjects(nextSubjects);
@@ -69,13 +73,45 @@ export default function AdminMaterialsPage() {
       setFiles(nextFiles);
     } catch (err) {
       console.error(err);
-      toast.error(err instanceof Error ? err.message : "Failed to load materials");
+      if (showError) {
+        toast.error(err instanceof Error ? err.message : "Failed to load materials");
+      }
     }
-  };
+  }, [selectedCourse]);
 
   useEffect(() => {
-    void refresh();
-  }, [selectedCourse]);
+    void refresh(true, true);
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!selectedCourse) {
+      return;
+    }
+
+    const tick = () => {
+      void refresh(false, false);
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void refresh(false, true);
+      }
+    };
+
+    const handleFocus = () => {
+      void refresh(false, true);
+    };
+
+    const intervalId = window.setInterval(tick, 8000);
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [refresh, selectedCourse]);
 
   useEffect(() => {
     const fetchTeachers = async () => {
@@ -141,6 +177,7 @@ export default function AdminMaterialsPage() {
   const teacherNameById = new Map(
     approvedTeachers.map((teacher) => [teacher.id, teacher.full_name])
   );
+  const teacherById = new Map(approvedTeachers.map((teacher) => [teacher.id, teacher]));
 
   const ownerTeacherIds = selectedCourse
     ? Array.from(
@@ -168,6 +205,14 @@ export default function AdminMaterialsPage() {
   const shareCandidates = approvedTeachers.filter(
     (teacher) => !ownerTeacherIds.includes(teacher.id)
   );
+  const sharedTeachers = shareCandidates.filter((teacher) =>
+    sharedTeacherIds.includes(teacher.id)
+  );
+
+  const formatTeacherWithUid = (teacher: TeacherOption): string => {
+    const displayName = formatTeacherDisplayName(teacher.full_name, teacher.designation);
+    return `${displayName} (${teacher.uid})`;
+  };
 
   const handleToggleTeacher = (teacherId: string) => {
     setSharingDirty(true);
@@ -450,8 +495,21 @@ export default function AdminMaterialsPage() {
             {ownerTeacherIds.length === 0
               ? "No owner detected"
               : ownerTeacherIds
-                  .map((teacherId) => teacherNameById.get(teacherId) ?? teacherId)
+                  .map((teacherId) => {
+                    const teacher = teacherById.get(teacherId);
+                    if (!teacher) {
+                      return teacherNameById.get(teacherId) ?? teacherId;
+                    }
+                    return formatTeacherWithUid(teacher);
+                  })
                   .join(", ")}
+          </div>
+
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+            <span className="font-semibold text-emerald-900">Shared With (Teacher/CR):</span>{" "}
+            {sharedTeachers.length === 0
+              ? "Not shared with any additional teacher/CR"
+              : sharedTeachers.map((teacher) => formatTeacherWithUid(teacher)).join(", ")}
           </div>
 
           {loadingTeachers ? (
@@ -483,10 +541,10 @@ export default function AdminMaterialsPage() {
                     />
                     <span>
                       <span className="block font-semibold text-slate-700">
-                        {teacher.full_name}
+                        {formatTeacherDisplayName(teacher.full_name, teacher.designation)}
                       </span>
                       <span className="block text-xs text-slate-500">
-                        UID: {teacher.uid} · {teacher.department ?? "No department"}
+                        {teacher.uid} · {teacher.department ?? "No department"}
                       </span>
                     </span>
                   </label>
@@ -506,10 +564,11 @@ export default function AdminMaterialsPage() {
         />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {files.map((f) => (
+          {files.map((f, index) => (
             <FileCard
               key={f.id}
               file={f}
+              serialNumber={index + 1}
               onDelete={(id) => setDeleteTarget(id)}
               onDownload={(file) =>
                 window.open(`/api/drive/download?fileId=${file.driveFileId}`, "_blank")

@@ -16,7 +16,7 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ role }: LoginPageProps) {
-  const { login, user, loading: authLoading, isInitialized } = useAuth();
+  const { login, user, isInitialized } = useAuth();
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -187,7 +187,7 @@ export default function LoginPage({ role }: LoginPageProps) {
           <div className="mt-8 space-y-4 text-center text-sm">
             {!isAdmin && (
               <p className="text-slate-600 dark:text-slate-400">
-                Don't have an account?{" "}
+                Don&apos;t have an account?{" "}
                 <Link
                   href="/register/teacher"
                   className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline transition-colors"

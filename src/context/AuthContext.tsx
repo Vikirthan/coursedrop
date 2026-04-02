@@ -32,27 +32,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
 
+  const fetchSessionUser = async (): Promise<User | null> => {
+    const res = await fetch(`/api/auth/session?_ts=${Date.now()}`, {
+      method: "GET",
+      credentials: "include",
+      cache: "no-store",
+      headers: {
+        "Cache-Control": "no-store",
+        Pragma: "no-cache",
+      },
+    });
+
+    if (!res.ok) {
+      return null;
+    }
+
+    const data = (await res.json()) as { user?: User | null };
+    return data.user ?? null;
+  };
+
   // hydrate from server session cookie on mount only
   useEffect(() => {
     const initialize = async () => {
       try {
-        const res = await fetch("/api/auth/session", {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-          headers: {
-            "Cache-Control": "no-store",
-            Pragma: "no-cache",
-          },
-        });
-
-        if (!res.ok) {
-          setUser(null);
-          return;
-        }
-
-        const data = (await res.json()) as { user?: User | null };
-        setUser(data.user ?? null);
+        const sessionUser = await fetchSessionUser();
+        setUser(sessionUser);
       } catch {
         setUser(null);
       } finally {
@@ -63,6 +67,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     void initialize();
   }, []);
+
+  useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
+
+    let syncing = false;
+
+    const syncSession = async () => {
+      if (syncing) {
+        return;
+      }
+
+      syncing = true;
+      try {
+        const sessionUser = await fetchSessionUser();
+        setUser(sessionUser);
+      } catch {
+        setUser(null);
+      } finally {
+        syncing = false;
+      }
+    };
+
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") {
+        void syncSession();
+      }
+    };
+
+    const onFocus = () => {
+      void syncSession();
+    };
+
+    const onPageShow = () => {
+      void syncSession();
+    };
+
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("pageshow", onPageShow);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onPageShow);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [isInitialized]);
 
   const login = async (
     identifier: string,

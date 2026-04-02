@@ -1,9 +1,7 @@
 "use client";
 import React from "react";
 import {
-  FiFilePlus,
   FiFileText,
-  FiImage,
   FiFile,
 } from "react-icons/fi";
 import {

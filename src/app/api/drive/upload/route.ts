@@ -174,6 +174,32 @@ export async function POST(req: NextRequest) {
     }
 
     const resolvedSubjectName = subjectName?.trim() || normalizedCourseCode;
+
+    const { data: potentialDuplicates, error: duplicateQueryError } = await supabase
+      .from("study_files")
+      .select(FILE_SELECT_COLUMNS)
+      .ilike("course_code", normalizedCourseCode)
+      .eq("size", file.size)
+      .limit(50);
+
+    if (duplicateQueryError) {
+      throw duplicateQueryError;
+    }
+
+    const normalizedIncomingName = file.name.trim().toLowerCase();
+    const duplicateRow = (potentialDuplicates ?? []).find((row) => {
+      const candidate = row as StudyFileRow;
+      return candidate.name.trim().toLowerCase() === normalizedIncomingName;
+    }) as StudyFileRow | undefined;
+
+    if (duplicateRow) {
+      return NextResponse.json({
+        file: toStudyFile(duplicateRow),
+        duplicate: true,
+        skipped: true,
+      });
+    }
+
     let targetFolderId =
       folderId && folderId.trim().length > 0
         ? folderId
