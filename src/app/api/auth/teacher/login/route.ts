@@ -7,6 +7,13 @@ import {
 } from "@/lib/session";
 import { User } from "@/lib/types";
 import { inferDesignationFromDepartment, normalizeDesignation } from "@/lib/utils";
+import {
+  buildAuthRateLimitKey,
+  checkAuthRateLimit,
+  clearAuthRateLimit,
+  isTrustedOrigin,
+  recordAuthFailure,
+} from "@/lib/authSecurity";
 
 type TeacherAccountRow = {
   id: string;
@@ -65,9 +72,25 @@ function getErrorMessage(err: unknown): string {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!isTrustedOrigin(req)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     const body = (await req.json()) as Partial<TeacherLoginPayload>;
     const identifier = (body.identifier ?? "").trim().toLowerCase();
     const password = body.password ?? "";
+    const rateLimitKey = buildAuthRateLimitKey("teacher-login", identifier, req);
+    const rateLimit = checkAuthRateLimit(rateLimitKey, {
+      windowMs: 15 * 60 * 1000,
+      maxAttempts: 10,
+    });
+
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Try again later." },
+        { status: 429 }
+      );
+    }
 
     if (!identifier || !password) {
       return NextResponse.json(
@@ -103,19 +126,19 @@ export async function POST(req: NextRequest) {
     }
 
     if (!data) {
+      recordAuthFailure(rateLimitKey, { windowMs: 15 * 60 * 1000, maxAttempts: 10 });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     const passwordOk = await compare(password, data.password_hash);
     if (!passwordOk) {
+      recordAuthFailure(rateLimitKey, { windowMs: 15 * 60 * 1000, maxAttempts: 10 });
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     if (!data.approved) {
-      return NextResponse.json(
-        { error: "Your account is pending admin approval" },
-        { status: 403 }
-      );
+      clearAuthRateLimit(rateLimitKey);
+      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
     const user: User = {
@@ -133,6 +156,7 @@ export async function POST(req: NextRequest) {
 
     const response = NextResponse.json({ user });
     response.cookies.set(getSessionCookieConfig(createSessionToken(user)));
+    clearAuthRateLimit(rateLimitKey);
 
     return response;
   } catch (err: unknown) {

@@ -25,6 +25,22 @@ It supports:
 - Dark mode support
 - Responsive layout for laptop, tablet, mobile, and orientation changes
 
+## Recent Updates (April 2026)
+
+- Upload metadata persistence hardened so newly uploaded files are visible across devices reliably.
+- Duplicate handling improved for teacher uploads (same name + size detection and cleanup support).
+- Delete UX improved for teacher/admin material lists:
+	- Deleted files are removed from UI immediately after successful delete.
+	- File card delete button now shows a live "Removing..." state during delete operations.
+- Auth/session reliability improvements:
+	- Server-truth session hydration via `/api/auth/session` for consistent login state.
+	- No-store auth/session fetch strategy to avoid stale auth responses.
+- Login security hardening:
+	- Origin/Referer trust checks added to login/logout routes.
+	- In-memory rate limiting added for admin and teacher login attempts.
+	- Admin login now supports `ADMIN_LOGIN_PASSWORD_HASH` (preferred) with fallback to plain password env.
+	- More generic login failure responses to reduce account-state leakage.
+
 ## Getting Started
 
 ### 1. Install dependencies
@@ -88,13 +104,27 @@ APP_SESSION_SECRET=
 
 # Admin login
 ADMIN_LOGIN_ID=
+ADMIN_LOGIN_PASSWORD_HASH=
 ADMIN_LOGIN_PASSWORD=
 ```
 
 Notes:
-- `ADMIN_LOGIN_ID` and `ADMIN_LOGIN_PASSWORD` are required for admin sign-in.
+- `ADMIN_LOGIN_ID` is required for admin sign-in.
+- Use `ADMIN_LOGIN_PASSWORD_HASH` (recommended) for admin sign-in secret.
+- `ADMIN_LOGIN_PASSWORD` is supported as fallback for backward compatibility.
 - `ADMIN_DELETE_PASSWORD` is required for deleting full course folders from admin interface.
+- Set `APP_SESSION_SECRET` in all environments for stable and secure session signing.
 - Resend requires a verified sender domain for production OTP emails. If you use a sender like `gmail.com`, OTP send will fail with 403. Set `RESEND_FROM_EMAIL` to an address on a verified domain in Resend. For testing only, you can use `onboarding@resend.dev`.
+
+### Generate `ADMIN_LOGIN_PASSWORD_HASH`
+
+You can generate a bcrypt hash locally and store only the hash in environment variables:
+
+```bash
+node -e "require('bcryptjs').hash(process.argv[1], 12).then(console.log)" "your-admin-password"
+```
+
+Then set the output as `ADMIN_LOGIN_PASSWORD_HASH`.
 
 ## Database Setup (Supabase)
 
@@ -206,6 +236,8 @@ scripts/
 
 - If Supabase requests fail, verify NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set exactly.
 - If uploads fail with service account quota errors, use Shared Drive configuration and verify Drive env values.
+- If login fails with 429, the route is temporarily rate-limited due to repeated attempts. Wait and retry.
+- If admin login breaks after switching to hash mode, verify `ADMIN_LOGIN_PASSWORD_HASH` is a valid bcrypt hash.
 - If dark mode does not react, ensure globals.css keeps the custom dark variant required by Tailwind v4.
 
 ## License
